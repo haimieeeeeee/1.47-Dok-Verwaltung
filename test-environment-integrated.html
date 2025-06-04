@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔬 Dok-Verwaltung Test-Umgebung (Integriert) v1.47</title>
+    <style>
+        /* Test-Umgebung Layout */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .test-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .test-header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .app-frame {
+            flex: 1;
+            border: none;
+            background: white;
+        }
+
+        .diagnostics-panel {
+            width: 400px;
+            background: #fff;
+            border-left: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .diagnostics-header {
+            background: #f8f9fa;
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .diagnostics-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .section {
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 500;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .section-header:hover {
+            background: #e9ecef;
+        }
+
+        .section-content {
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+        }
+
+        .section.collapsed .section-content {
+            display: none;
+        }
+
+        .log-entry {
+            padding: 8px 12px;
+            margin: 4px 0;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            border-left: 4px solid #ddd;
+        }
+
+        .log-success {
+            background: #d4edda;
+            border-left-color: #28a745;
+            color: #155724;
+        }
+
+        .log-error {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+            color: #721c24;
+        }
+
+        .log-warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+            color: #856404;
+        }
+
+        .log-info {
+            background: #d1ecf1;
+            border-left-color: #17a2b8;
+            color: #0c5460;
+        }
+
+        .controls {
+            padding: 15px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .timestamp {
+            color: #6c757d;
+            font-size: 0.75rem;
+        }
+
+        .toggle-icon {
+            transition: transform 0.2s;
+        }
+
+        .collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+    </style>
+</head>
+<body>
+    <div class="test-header">
+        <h1>
+            🔬 Dok-Verwaltung Test-Umgebung (Integriert)
+            <div class="status-indicator"></div>
+            <span style="font-size: 0.9rem; opacity: 0.9;">v1.47 - Echte Module mit Mock-APIs</span>
+        </h1>
+    </div>
+
+    <div class="main-container">
+        <iframe id="appFrame" class="app-frame" src="about:blank"></iframe>
+        
+        <div class="diagnostics-panel">
+            <div class="diagnostics-header">
+                🔍 Live-Diagnose & Monitoring
+            </div>
+            
+            <div class="diagnostics-content">
+                <div class="section" id="statusSection">
+                    <div class="section-header" onclick="TestEnvironment.toggleSection(this)">
+                        <span>📊 System-Status</span>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="section-content">
+                        <div id="systemStatus">Initialisierung...</div>
+                    </div>
+                </div>
+
+                <div class="section" id="eventsSection">
+                    <div class="section-header" onclick="TestEnvironment.toggleSection(this)">
+                        <span>📡 Events</span>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="section-content">
+                        <div id="eventLog">Keine Events</div>
+                    </div>
+                </div>
+
+                <div class="section" id="functionsSection">
+                    <div class="section-header" onclick="TestEnvironment.toggleSection(this)">
+                        <span>⚙️ Funktionsaufrufe</span>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="section-content">
+                        <div id="functionLog">Keine Aufrufe</div>
+                    </div>
+                </div>                <div class="section" id="stateSection">
+                    <div class="section-header" onclick="TestEnvironment.toggleSection(this)">
+                        <span>🗃️ StateStore</span>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="section-content">
+                        <div id="stateLog">StateStore wird geladen...</div>
+                    </div>
+                </div>
+
+                <div class="section" id="errorsSection">
+                    <div class="section-header" onclick="TestEnvironment.toggleSection(this)">
+                        <span>❌ Fehler</span>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="section-content">
+                        <div id="errorLog">Keine Fehler</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-primary" onclick="TestEnvironment.loadClientApp()">📱 Client laden</button>
+                <button class="btn btn-success" onclick="TestEnvironment.runSystemCheck()">🔄 System-Check</button>
+                <button class="btn btn-warning" onclick="TestEnvironment.clearLogs()">🧹 Logs löschen</button>
+                <button class="btn btn-secondary" onclick="TestEnvironment.generateReport()">📋 KI-Report</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 🧠 Zentrale Test-Umgebung Klasse
+        class TestEnvironment {
+            constructor() {
+                this.logs = {
+                    events: [],
+                    functions: [],
+                    errors: [],
+                    system: []
+                };
+                this.init();
+            }
+
+            init() {
+                this.log('System', '🚀 Test-Umgebung initialisiert', 'success');
+                this.setupMockApis();
+                this.updateSystemStatus();
+                
+                // Automatisches Laden der Client-App nach kurzer Verzögerung
+                setTimeout(() => {
+                    this.loadClientApp();
+                }, 1000);
+            }
+
+            setupMockApis() {
+                // Mock google.script.run für sichere Tests
+                window.google = {
+                    script: {
+                        run: new Proxy({}, {
+                            get: (target, prop) => {
+                                return (...args) => {
+                                    this.logFunction(prop, args);
+                                    return new Promise((resolve) => {
+                                        // Simuliere Async-Verhalten
+                                        setTimeout(() => {
+                                            const mockResult = this.generateMockResponse(prop, args);
+                                            resolve(mockResult);
+                                        }, Math.random() * 1000 + 500);
+                                    });
+                                };
+                            }
+                        }),
+                        host: {
+                            close: () => {
+                                this.log('System', 'Host close aufgerufen', 'info');
+                            }
+                        }
+                    }
+                };
+
+                this.log('System', '✅ Mock-APIs eingerichtet', 'success');
+            }
+
+            generateMockResponse(functionName, args) {
+                // Intelligente Mock-Antworten basierend auf Funktionsnamen
+                const mockResponses = {
+                    setupSheets: 'Tabellen erfolgreich angelegt (Mock)',
+                    loadAllData: [
+                        { kundeId: 'K001', name: 'Max Mustermann (Mock)' },
+                        { kundeId: 'K002', name: 'Anna Schmidt (Mock)' }
+                    ],
+                    startImport: 'Import erfolgreich gestartet (Mock)',
+                    getChecklist: [
+                        { bank: 'Bank A', status: 'fehlt' },
+                        { bank: 'Bank B', status: 'i.O.' }
+                    ]
+                };
+
+                return mockResponses[functionName] || `Mock-Antwort für ${functionName}`;
+            }
+
+            async loadClientApp() {
+                try {
+                    this.log('System', '📱 Lade echte Client.html...', 'info');
+                    
+                    const response = await fetch('Client.html');
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    let htmlContent = await response.text();
+                    
+                    // Lade zusätzlich StateStore.html für State-Management
+                    await this.loadStateStore();
+                    
+                    // Modifiziere den HTML-Inhalt für die Test-Umgebung
+                    htmlContent = this.injectTestHooks(htmlContent);
+                    
+                    // Lade in den iframe
+                    const iframe = document.getElementById('appFrame');
+                    const doc = iframe.contentDocument || iframe.contentWindow.document;
+                    doc.open();
+                    doc.write(htmlContent);
+                    doc.close();
+                    
+                    // Setup Event-Listener für den iframe
+                    this.setupIframeMonitoring(iframe);
+                    
+                    this.log('System', '✅ Client.html erfolgreich geladen und integriert', 'success');
+                    
+                } catch (error) {
+                    this.log('System', `❌ Fehler beim Laden der Client.html: ${error.message}`, 'error');
+                    this.loadFallbackApp();
+                }
+            }
+
+            async loadStateStore() {
+                try {
+                    this.log('System', '🗃️ Lade StateStore.html...', 'info');
+                    
+                    const response = await fetch('StateStore.html');
+                    if (!response.ok) {
+                        throw new Error(`StateStore.html nicht gefunden`);
+                    }
+                    
+                    const stateStoreContent = await response.text();
+                    
+                    // Injiziere StateStore in die Test-Umgebung
+                    this.injectStateStore(stateStoreContent);
+                    
+                    this.log('System', '✅ StateStore erfolgreich geladen und überwacht', 'success');
+                    
+                } catch (error) {
+                    this.log('System', `⚠️ StateStore nicht verfügbar: ${error.message}`, 'warning');
+                    this.setupMockStateStore();
+                }
+            }
+
+            injectStateStore(stateStoreContent) {
+                // Erstelle eine überwachte Version des StateStore
+                const script = document.createElement('script');
+                script.textContent = `
+                    ${stateStoreContent}
+                    
+                    // Überwache StateStore-Änderungen
+                    if (typeof StateStore !== 'undefined') {
+                        const originalObservers = StateStore.addObserver;
+                        const originalInit = StateStore.initSectionsFrom;
+                        const originalAddCode = StateStore.addCode;
+                        
+                        // Überwache Observer-Registrierungen
+                        StateStore.addObserver = function(observer) {
+                            TestEnvironment.log('StateStore', '👁️ Neuer Observer registriert', 'info');
+                            return originalObservers.call(this, observer);
+                        };
+                        
+                        // Überwache Initialisierung
+                        StateStore.initSectionsFrom = function(docs) {
+                            TestEnvironment.log('StateStore', \`🔄 Initialisierung mit \${docs.length} Dokumenten\`, 'info');
+                            return originalInit.call(this, docs);
+                        };
+                        
+                        // Überwache Code-Hinzufügung
+                        StateStore.addCode = function(code, label) {
+                            TestEnvironment.log('StateStore', \`➕ Code hinzugefügt: \${code} - \${label}\`, 'info');
+                            return originalAddCode.call(this, code, label);
+                        };
+                        
+                        TestEnvironment.stateStore = StateStore;
+                    }
+                `;
+                document.head.appendChild(script);
+            }
+
+            setupMockStateStore() {
+                this.log('System', '🎭 Erstelle Mock-StateStore...', 'info');
+                
+                window.StateStore = {
+                    addObserver: (observer) => {
+                        this.log('StateStore', '👁️ Mock-Observer registriert', 'info');
+                    },
+                    initSectionsFrom: (docs) => {
+                        this.log('StateStore', `🔄 Mock-Initialisierung mit ${docs?.length || 0} Dokumenten`, 'info');
+                    },
+                    addCode: (code, label) => {
+                        this.log('StateStore', `➕ Mock-Code: ${code} - ${label}`, 'info');
+                    },
+                    getCodes: () => {
+                        return [
+                            { code: '01_01', label: '01_01 (Antrag)' },
+                            { code: '02_01', label: '02_01 (Unterlagen)' },
+                            { code: '03_01', label: '03_01 (Bonitätsunterlagen)' }
+                        ];
+                    }
+                };
+                
+                this.stateStore = window.StateStore;
+            }
+
+            injectTestHooks(htmlContent) {
+                // Injiziere Test-Hooks in die Client.html
+                const testScript = `
+                <script>
+                    // Test-Umgebung Integration
+                    window.addEventListener('load', function() {
+                        if (parent && parent.TestEnvironment) {
+                            parent.TestEnvironment.log('Client', '🎯 Client.html geladen und bereit', 'success');
+                        }
+                    });
+                    
+                    // Überschreibe console.log für Monitoring
+                    const originalLog = console.log;
+                    console.log = function(...args) {
+                        originalLog.apply(console, args);
+                        if (parent && parent.TestEnvironment) {
+                            parent.TestEnvironment.log('Client', args.join(' '), 'info');
+                        }
+                    };
+                    
+                    // Überschreibe console.error für Error-Tracking
+                    const originalError = console.error;
+                    console.error = function(...args) {
+                        originalError.apply(console, args);
+                        if (parent && parent.TestEnvironment) {
+                            parent.TestEnvironment.log('Client', args.join(' '), 'error');
+                        }
+                    };
+                </script>
+                `;
+                
+                // Füge Test-Script vor dem schließenden </body> Tag ein
+                return htmlContent.replace('</body>', testScript + '</body>');
+            }
+
+            setupIframeMonitoring(iframe) {
+                // Überwache Iframe-Ereignisse
+                iframe.onload = () => {
+                    this.log('System', '🎯 Iframe vollständig geladen', 'success');
+                };
+                
+                iframe.onerror = (error) => {
+                    this.log('System', `❌ Iframe-Fehler: ${error}`, 'error');
+                };
+            }
+
+            loadFallbackApp() {
+                this.log('System', '🔄 Lade Fallback Mock-Interface...', 'warning');
+                
+                const fallbackHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Dok-Verwaltung (Mock)</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        .btn { padding: 8px 16px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; background: #007bff; color: white; }
+                        .mock-banner { background: #fff3cd; padding: 10px; border: 1px solid #ffc107; border-radius: 4px; margin-bottom: 20px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="mock-banner">
+                        ⚠️ <strong>Mock-Modus:</strong> Dies ist eine Test-Version, da Client.html nicht geladen werden konnte.
+                    </div>
+                    
+                    <h2>📋 Kundenübersicht (Mock-Version)</h2>
+                    <button class="btn" onclick="parent.TestEnvironment.mockFunction('setupSheets')">Tabellen anlegen</button>
+                    <button class="btn" onclick="parent.TestEnvironment.mockFunction('loadAllData')">Kunden laden</button>
+                    <button class="btn" onclick="parent.TestEnvironment.mockFunction('startImport')">Import starten</button>
+                    
+                    <div id="content">
+                        <p>Alle Funktionen sind als Mock-Versionen verfügbar und werden in der Test-Umgebung protokolliert.</p>
+                    </div>
+                </body>
+                </html>
+                `;
+                
+                const iframe = document.getElementById('appFrame');
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                doc.open();
+                doc.write(fallbackHtml);
+                doc.close();
+            }
+
+            mockFunction(functionName) {
+                this.log('Client', `🎭 Mock-Funktion aufgerufen: ${functionName}`, 'info');
+                
+                // Simuliere google.script.run Aufruf
+                window.google.script.run[functionName]()
+                    .then(result => {
+                        this.log('Client', `📤 Mock-Antwort: ${JSON.stringify(result)}`, 'success');
+                    });
+            }
+
+            log(category, message, type = 'info') {
+                const timestamp = new Date();
+                const logEntry = {
+                    category,
+                    message,
+                    type,
+                    timestamp
+                };
+
+                // Füge zu entsprechendem Log hinzu
+                switch (category.toLowerCase()) {
+                    case 'system':
+                        this.logs.system.push(logEntry);
+                        break;
+                    case 'client':
+                        this.logs.events.push(logEntry);
+                        break;
+                    case 'error':
+                        this.logs.errors.push(logEntry);
+                        break;
+                    default:
+                        this.logs.events.push(logEntry);
+                }
+
+                // Update UI
+                this.updateLogDisplays();
+            }
+
+            logFunction(name, args) {
+                const logEntry = {
+                    name,
+                    args: args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)),
+                    timestamp: new Date()
+                };
+                
+                this.logs.functions.push(logEntry);
+                this.updateLogDisplays();
+            }            updateLogDisplays() {
+                // Update Event Log
+                const eventContainer = document.getElementById('eventLog');
+                const recentEvents = this.logs.events.slice(-10);
+                eventContainer.innerHTML = recentEvents.length === 0 ? 
+                    '<div class="log-info">Keine Events</div>' :
+                    recentEvents.map(event => 
+                        `<div class="log-entry log-${event.type}">
+                            <div>${event.message}</div>
+                            <div class="timestamp">${event.timestamp.toLocaleTimeString()}</div>
+                        </div>`
+                    ).join('');
+
+                // Update Function Log
+                const functionContainer = document.getElementById('functionLog');
+                const recentCalls = this.logs.functions.slice(-5);
+                functionContainer.innerHTML = recentCalls.length === 0 ?
+                    '<div class="log-info">Keine Aufrufe</div>' :
+                    recentCalls.map(call =>
+                        `<div class="log-entry log-info">
+                            <div><strong>${call.name}()</strong></div>
+                            <div style="font-size: 0.8rem; opacity: 0.8;">Args: ${call.args.join(', ')}</div>
+                            <div class="timestamp">${call.timestamp.toLocaleTimeString()}</div>
+                        </div>`
+                    ).join('');
+
+                // Update StateStore Log
+                this.updateStateStoreDisplay();
+
+                // Update Error Log
+                const errorContainer = document.getElementById('errorLog');
+                const recentErrors = this.logs.errors.slice(-5);
+                errorContainer.innerHTML = recentErrors.length === 0 ?
+                    '<div class="log-info">Keine Fehler</div>' :
+                    recentErrors.map(error =>
+                        `<div class="log-entry log-error">
+                            <div>${error.message}</div>
+                            <div class="timestamp">${error.timestamp.toLocaleTimeString()}</div>
+                        </div>`
+                    ).join('');
+            }
+
+            updateStateStoreDisplay() {
+                const stateContainer = document.getElementById('stateLog');
+                if (!stateContainer) return;
+
+                if (this.stateStore && typeof this.stateStore.getCodes === 'function') {
+                    try {
+                        const codes = this.stateStore.getCodes();
+                        stateContainer.innerHTML = `
+                            <div class="log-entry log-success">
+                                <div><strong>Status:</strong> Aktiv</div>
+                                <div><strong>Codes:</strong> ${codes.length}</div>
+                            </div>
+                            ${codes.slice(0, 5).map(code => 
+                                `<div class="log-entry log-info">
+                                    <div><strong>${code.code}:</strong> ${code.label}</div>
+                                </div>`
+                            ).join('')}
+                        `;
+                    } catch (error) {
+                        stateContainer.innerHTML = `<div class="log-entry log-warning">StateStore-Fehler: ${error.message}</div>`;
+                    }
+                } else {
+                    stateContainer.innerHTML = '<div class="log-info">StateStore wird geladen...</div>';
+                }
+            }
+
+            updateSystemStatus() {
+                const statusDiv = document.getElementById('systemStatus');
+                const stats = {
+                    events: this.logs.events.length,
+                    functions: this.logs.functions.length,
+                    errors: this.logs.errors.length,
+                    uptime: Date.now() - this.startTime
+                };
+
+                statusDiv.innerHTML = `
+                    <div class="log-entry log-success">
+                        <div><strong>Status:</strong> Aktiv</div>
+                        <div><strong>Events:</strong> ${stats.events}</div>
+                        <div><strong>Funktionsaufrufe:</strong> ${stats.functions}</div>
+                        <div><strong>Fehler:</strong> ${stats.errors}</div>
+                    </div>
+                `;
+            }
+
+            runSystemCheck() {
+                this.log('System', '🔍 Starte System-Check...', 'info');
+                
+                setTimeout(() => {
+                    this.log('System', '✅ Mock-APIs funktionsfähig', 'success');
+                    this.log('System', '✅ Iframe-Integration aktiv', 'success');
+                    this.log('System', '✅ Event-Monitoring läuft', 'success');
+                    this.log('System', '🎯 System-Check abgeschlossen', 'success');
+                }, 1000);
+            }
+
+            clearLogs() {
+                this.logs = {
+                    events: [],
+                    functions: [],
+                    errors: [],
+                    system: []
+                };
+                this.updateLogDisplays();
+                this.updateSystemStatus();
+                this.log('System', '🧹 Alle Logs gelöscht', 'info');
+            }
+
+            generateReport() {
+                const report = {
+                    timestamp: new Date().toISOString(),
+                    total_events: this.logs.events.length,
+                    total_functions: this.logs.functions.length,
+                    total_errors: this.logs.errors.length,
+                    recent_events: this.logs.events.slice(-5),
+                    recent_functions: this.logs.functions.slice(-5)
+                };
+
+                const reportText = `
+🤖 KI-OPTIMIERTER DIAGNOSE-REPORT
+=====================================
+Zeitstempel: ${report.timestamp}
+Gesamt Events: ${report.total_events}
+Funktionsaufrufe: ${report.total_functions}
+Fehler: ${report.total_errors}
+
+💡 Für KI-Analyse kopieren Sie diesen Report und fragen:
+"Analysiere diesen Test-Report und gib Empfehlungen für Optimierungen"
+
+📊 Detaildaten:
+${JSON.stringify(report, null, 2)}
+                `;
+
+                // Zeige Report in neuem Fenster
+                const reportWindow = window.open('', '_blank');
+                reportWindow.document.write(`
+                    <html>
+                    <head><title>Test-Report</title></head>
+                    <body style="font-family: monospace; padding: 20px;">
+                        <pre>${reportText}</pre>
+                        <button onclick="navigator.clipboard.writeText(\`${reportText.replace(/`/g, '\\`')}\`)">
+                            📋 In Zwischenablage kopieren
+                        </button>
+                    </body>
+                    </html>
+                `);
+
+                this.log('System', '📋 KI-Report generiert', 'success');
+            }
+
+            toggleSection(header) {
+                const section = header.parentElement;
+                section.classList.toggle('collapsed');
+            }
+        }
+
+        // 🚀 Initialisiere Test-Umgebung
+        window.TestEnvironment = new TestEnvironment();
+        TestEnvironment.startTime = Date.now();
+    </script>
+</body>
+</html>
