@@ -52,8 +52,19 @@ Umfassendes Dokumentenmanagement-System für Bankdarlehen mit Google Apps Script
 - 🔬 **Lokale Test-Umgebung**: `test-environment-fixed.html`
 - 📋 **CLASP Konfiguration**: `.clasp.json`
 - 🚀 **Deploy Scripts**: `deploy.ps1`, `deploy_final.ps1`
+- 🔄 **GitHub Repository**: [1.47-Dok-Verwaltung](https://github.com/haimieeeeeee/1.47-Dok-Verwaltung)
 
 ## 🚀 Schnellstart
+
+### **Repository Setup:**
+```bash
+# Repository klonen
+git clone https://github.com/haimieeeeeee/1.47-Dok-Verwaltung.git
+cd 1.47-Dok-Verwaltung
+
+# CLASP installieren (falls nicht vorhanden)
+npm install -g @google/clasp
+```
 
 ### **Lokale Entwicklung:**
 1. **Test-Umgebung öffnen**:
