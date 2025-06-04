@@ -1,0 +1,62 @@
+# Google Apps Script - Sensitive Konfiguration
+# .clasp.json sollte normalerweise nicht committed werden (enthält Script-ID)
+# Aber für Backup-Zwecke können wir es einschließen
+
+# Node modules (falls später hinzugefügt)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+*.log
+logs/
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# IDE und Editor-Dateien
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generierte Dateien
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporäre Dateien
+*.tmp
+*.temp
+.cache/
+
+# Backup-Dateien (wir haben viele Kopien)
+*-Kopie*
+*_backup*
+*_old*
+*_new*
+
+# Test-Umgebung Logs (falls sie groß werden)
+test-environment-logs/
+
+# PowerShell Profile (falls vorhanden)
+Microsoft.PowerShell_profile.ps1
+
+# Environment-spezifische Dateien
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
