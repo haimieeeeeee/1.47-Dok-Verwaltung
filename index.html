@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Dok-Verwaltung (Optimized)</title>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 1rem; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <!-- Spinner -->
+  <div id="spinner" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);">
+    <div class="spinner-border"></div>
+  </div>
+
+  <!-- Import-Formular -->
+  <div id="importForm" class="hidden" style="border:1px solid #ccc; padding:1rem; margin:1rem 0; background:#fff;">
+    <h3>HTML-Eingabe (z.B. eHTML-Blob)</h3>
+    <textarea id="importText" style="width:100%; height:150px;"></textarea>
+    <div style="margin-top:0.5rem;">
+      <button onclick="startImport()">Parser starten + Import</button>
+      <button onclick="toggleImportForm()">Abbrechen</button>
+    </div>
+    <pre id="parserPreview" style="margin-top:1rem; border:1px solid #ccc; padding:0.5rem; white-space: pre;"></pre>
+  </div>
+
+  <!-- VIEW: INDEX -->
+  <div id="viewIndex">
+    <h2>Kundenübersicht</h2>
+    <div id="indexInfo"></div>
+    <button onclick="setupSheets()">Tabellen anlegen</button>
+    <button onclick="toggleImportForm()">Rohdaten importieren (Parser)</button>
+    <button onclick="loadAllData(()=>showView('viewIndex'))">Kunden laden (Full-Load)</button>
+    <table>
+      <thead>
+        <tr><th>KundeID</th><th>Name(n)</th><th>Aktion</th></tr>
+      </thead>
+      <tbody id="custTbody"></tbody>
+    </table>
+  </div>
+
+  <!-- VIEW: KUNDE -->
+  <div id="viewKunde" class="hidden">
+    <h2>Kundenansicht</h2>
+    <div id="kundeInfo"></div>
+    <h3>Checklisten</h3>
+    <table>
+      <thead>
+        <tr><th>Bank</th><th>Status</th><th>Aktion</th></tr>
+      </thead>
+      <tbody id="checkTbody"></tbody>
+    </table>
+    <p><button onclick="goIndex()">&larr; Zur Übersicht</button></p>
+  </div>
+
+  <!-- VIEW: CHECKLISTE -->
+  <div id="viewCheck" class="hidden">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h2 id="checklistHeader">Checkliste</h2>
+      <button onclick="goKunde()" class="backButton">&larr; Zurück</button>
+    </div>
+    <div id="checkInfo"></div>
+    <div class="actionBar">
+      <div class="filterOptions">
+        <label><input type="checkbox" id="cbFehlt" checked> fehlt</label>
+        <label><input type="checkbox" id="cbFehlerhaft" checked> fehlerhaft</label>
+        <label><input type="checkbox" id="cbIo" checked> i.O.</label>
+        <label><input type="checkbox" id="cbHidden"> ausgeblendet</label>
+      </div>
+      <div class="actionButtons">
+        <button onclick="applyFilter()">Filter anwenden</button>
+        <button onclick="exportAsPdf()">PDF Export</button>
+        <button onclick="saveAllLocalChanges()">Änderungen speichern</button>
+      </div>
+    </div>
+    <table>
+      <tbody id="docTbody"></tbody>
+    </table>
+    <p><button onclick="goKunde()" class="backButton">&larr; Zur Übersicht</button></p>
+  </div>
+
+  <!-- Skript-Einbindungen in korrekter Reihenfolge -->
+  <?!= include("ModalManager") ?>
+  <?!= include("ButtonModule") ?>
+  <?!= include("UIModule") ?>
+  <?!= include("StateStore") ?>
+  <!-- WrapperModule und DOMUtils sind jetzt direkt in Code.js integriert -->
+  <?!= include("DarlehensModule") ?>
+  <?!= include("DarlehensnehmerModule") ?>
+  <?!= include("ParserModule") ?>
+  <?!= include("ErrorHandlingModule") ?>
+  <?!= include("LoggerModule") ?>
+  <?!= include("ConfigModule") ?>
+  <?!= include("DataAccessModule") ?>
+  <?!= include("SheetsModule") ?>
+  <?!= include("DriveModule") ?>
+  <?!= include("CacheModule") ?>
+  <?!= include("ChecklistModule") ?>
+  <?!= include("ClientController") ?>
+  <?!= include("init") ?>
+</body>
+</html>

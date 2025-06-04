@@ -1,0 +1,197 @@
+<!-- DarlehensnehmerModule.html -->
+<script>
+/***************************************************
+ * DarlehensnehmerModule - Improved (modular & event-kompatibel)
+ * Dieses Modul verwaltet das Darlehensnehmer-Modal.
+ * Es bietet Funktionen zum Öffnen, Vorbelegen, Verarbeiten und Schließen des Formulars.
+ ***************************************************/
+const DarlehensnehmerModule = (() => {
+  // Öffnet das Darlehensnehmer-Modal und speichert Code und Sektion
+  function openForm(code, sektion) {
+    window._tbCode = code;
+    window._tbSektion = sektion;
+    const modal = ModalManager.getModal("textbausteineModal_darlehensnehmer");
+    if (!modal) {
+      console.error("Darlehensnehmer-Modal nicht gefunden!");
+      return;
+    }
+    ModalManager.openModal("textbausteineModal_darlehensnehmer");
+
+    // -- HILFSFUNKTIONEN FÜR DATUMS-VORBELEGUNG --
+    const now = new Date();
+
+    // Liefert das Vorjahr als Zahl. (Aktuell z.B. 2024, wenn wir in 2025 sind.)
+    const getPreviousYear = () => (now.getFullYear() - 1).toString();
+
+    // Erzeugt einen String "Monat Jahr" (z. B. "Januar 2025"),
+    // wobei offset = -1 => Vormonat, -2 => Vor-Vormonat etc.
+    const getMonthYear = (offset) => {
+      const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+      const months = [
+        "Januar","Februar","März","April","Mai","Juni",
+        "Juli","August","September","Oktober","November","Dezember"
+      ];
+      return months[d.getMonth()] + " " + d.getFullYear();
+    };
+
+    // -- FELDER VORBELEGEN --
+    // 1) Lohn-/und Gehaltsabrechnung Dezember (Vorjahr)
+    const inputDezember = modal.querySelector("#input_dezember");
+    if (inputDezember) {
+      inputDezember.value = getPreviousYear();
+    }
+
+    // 2) Elektronische Lohnsteuerbescheinigung (Vorjahr)
+    const inputLohnsteuer = modal.querySelector("#input_lohnsteuer");
+    if (inputLohnsteuer) {
+      inputLohnsteuer.value = getPreviousYear();
+    }
+
+    // 3) Kontoauszüge
+    //    - Kontoauszug 1: Vormonat
+    const inpKonto1 = modal.querySelector("#inp_konto_1");
+    if (inpKonto1) {
+      inpKonto1.value = getMonthYear(-1);
+    }
+    //    - Kontoauszug 2: Vor-Vormonat
+    const inpKonto2 = modal.querySelector("#inp_konto_2");
+    if (inpKonto2) {
+      inpKonto2.value = getMonthYear(-2);
+    }
+    //    - Kontoauszug 3: Vor-vor-Vormonat
+    const inpKonto3 = modal.querySelector("#inp_konto_3");
+    if (inpKonto3) {
+      inpKonto3.value = getMonthYear(-3);
+    }
+  }
+
+  // Liest die Eingaben im Darlehensnehmer-Modal aus, erstellt entsprechende Dokumenteinträge
+  // und fügt sie dem globalen Änderungs-Management hinzu.
+  function processForm() {
+    const modal = document.getElementById("textbausteineModal_darlehensnehmer");
+    if (!modal) return;
+    let newDocs = [];
+
+    // Aufenthaltstitel
+    const cbAufenthalt = modal.querySelector("#cb_aufenthaltstitel");
+    if (cbAufenthalt && cbAufenthalt.checked) {
+      newDocs.push({
+        code: window._tbCode,
+        sektion: window._tbSektion,
+        docText: "Aufenthaltstitel"
+      });
+    }
+    // Arbeitsvertrag
+    const cbArbeitsvertrag = modal.querySelector("#cb_arbeitsvertrag");
+    if (cbArbeitsvertrag && cbArbeitsvertrag.checked) {
+      newDocs.push({
+        code: window._tbCode,
+        sektion: window._tbSektion,
+        docText: "Arbeitsvertrag"
+      });
+    }
+    // Arbeitsvertrag Nebenjob
+    const cbArbeitsvertragNebenjob = modal.querySelector("#cb_arbeitsvertrag_nebenjob");
+    if (cbArbeitsvertragNebenjob && cbArbeitsvertragNebenjob.checked) {
+      newDocs.push({
+        code: window._tbCode,
+        sektion: window._tbSektion,
+        docText: "Arbeitsvertrag Nebenjob"
+      });
+    }
+    // Lohn-/Gehaltsabrechnung Nebenjob (letzte 3 Monate)
+    const cbLohnNebenjob = modal.querySelector("#cb_lohn_gehalt_nebenjob");
+    if (cbLohnNebenjob && cbLohnNebenjob.checked) {
+      newDocs.push({
+        code: window._tbCode,
+        sektion: window._tbSektion,
+        docText: "Lohn-/Gehaltsabrechnung Nebenjob (letzte 3 Monate)"
+      });
+    }
+    // Lohn-/und Gehaltsabrechnung Dezember
+    const cbLohnDezember = modal.querySelector("#cb_lohn_gehalt_dezember");
+    if (cbLohnDezember && cbLohnDezember.checked) {
+      const inputDezember = modal.querySelector("#input_dezember");
+      const jahr = inputDezember ? inputDezember.value.trim() : "";
+      newDocs.push({
+        code: window._tbCode,
+        sektion: window._tbSektion,
+        docText: "Lohn-/und Gehaltsabrechnung Dezember " + (jahr || "")
+      });
+    }
+    // Private Krankenversicherung: aktueller Beitragsbescheid
+    const cbKrankenversicherung = modal.querySelector("#cb_private_krankenversicherung");
+    if (cbKrankenversicherung && cbKrankenversicherung.checked) {
+      newDocs.push({
+        code: window._tbCode,
+        sektion: window._tbSektion,
+        docText: "Private Krankenversicherung: aktueller Beitragsbescheid"
+      });
+    }
+    // Elektronische Lohnsteuerbescheinigung
+    const cbLohnsteuer = modal.querySelector("#cb_lohnsteuerbescheinigung");
+    if (cbLohnsteuer && cbLohnsteuer.checked) {
+      const inputLohnsteuer = modal.querySelector("#input_lohnsteuer");
+      const jahr = inputLohnsteuer ? inputLohnsteuer.value.trim() : "";
+      newDocs.push({
+        code: window._tbCode,
+        sektion: window._tbSektion,
+        docText: "Elektronische Lohnsteuerbescheinigung " + (jahr || "")
+      });
+    }
+    // Kontoauszüge (letzte 3 Monate) – pro Konto prüfen:
+    for (let i = 1; i <= 3; i++) {
+      const cbKonto = modal.querySelector("#cb_konto_" + i);
+      const inpKonto = modal.querySelector("#inp_konto_" + i);
+      if (cbKonto && cbKonto.checked && inpKonto && inpKonto.value.trim() !== "") {
+        newDocs.push({
+          code: window._tbCode,
+          sektion: window._tbSektion,
+          docText: "Kontoauszug " + inpKonto.value.trim()
+        });
+      }
+    }
+
+    // Integration in das globale Änderungs-Management (bestehende Funktionalität bleibt erhalten)
+    if (!window._UNSAVED_CHANGES) {
+      window._UNSAVED_CHANGES = { additions: [] };
+    }
+    newDocs.forEach(doc => {
+      const tempId = "temp_" + new Date().getTime() + "_" + Math.random().toString().slice(2);
+      const newDocObj = {
+        docId: tempId,
+        checkId: window.currentCheckId,
+        code: window._tbCode,
+        sektion: window._tbSektion,
+        docText: doc.docText,
+        okFileId: "",
+        errFileId: "",
+        hiddenFlag: false,
+        errComment: "",
+        notes: "",
+        docRunNo: ""
+      };
+      window._UNSAVED_CHANGES.additions.push(newDocObj);
+      if (window.allDocs && Array.isArray(window.allDocs)) {
+        window.allDocs.push(newDocObj);
+      }
+    });
+    closeForm();
+    if (typeof applyFilter === "function") {
+      applyFilter();
+    }
+    alert("Es wurden " + newDocs.length + " neue Unterlagen vorgemerkt.");
+  }
+
+  // Schließt das Darlehensnehmer-Modal
+  function closeForm() {
+    ModalManager.closeModal("textbausteineModal_darlehensnehmer");
+  }
+
+  return {
+    openForm,
+    processForm,
+    closeForm
+  };
+})();
+</script>

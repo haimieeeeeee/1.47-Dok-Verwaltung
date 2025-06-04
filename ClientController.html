@@ -1,0 +1,622 @@
+<script>
+// === ClientController.html (Nur Skript, KEINE eigenständige <html>/<body>!) ===
+
+// Globale Variablen
+window.currentKundeId = "";
+window.currentCheckId = "";
+window.allDocs = [];
+
+window._FULLDATA = { customers: [], checklists: [], docs: [] };
+window._UNSAVED_CHANGES = { checkId: "", additions: [], moves: {}, hiddenFlags: {}, comments: {}, notes: {} };
+
+let inactivityTimer = null;
+function resetInactivityTimer() {
+  if (inactivityTimer) clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(() => { if (isDirty()) saveAllLocalChanges(); }, 60 * 1000);
+}
+window.addEventListener("click", resetInactivityTimer);
+window.addEventListener("keydown", resetInactivityTimer);
+
+function isDirty() {
+  const u = window._UNSAVED_CHANGES;
+  return !!(u.checkId || u.additions.length || Object.keys(u.moves).length ||
+            Object.keys(u.hiddenFlags).length || Object.keys(u.comments).length || Object.keys(u.notes).length);
+}
+
+function showSpinner() {
+  document.getElementById("spinner").style.display = "block";
+}
+function hideSpinner() {
+  document.getElementById("spinner").style.display = "none";
+}
+
+function resetLocalChanges() {
+  window._UNSAVED_CHANGES = { checkId: "", additions: [], moves: {}, hiddenFlags: {}, comments: {}, notes: {} };
+}
+
+function showView(viewId) {
+  ["viewIndex", "viewKunde", "viewCheck"].forEach(v => {
+    document.getElementById(v).classList.add("hidden");
+  });
+  document.getElementById(viewId).classList.remove("hidden");
+}
+
+/* 
+ * Global helper: Bestimmt den Status eines Dokuments.
+ * Rückgabe:
+ *   - "fehlt", wenn weder okFileId noch errFileId gesetzt sind
+ *   - "io", wenn okFileId gesetzt ist
+ *   - ansonsten "fehlerhaft"
+ */
+function docStatus(d) {
+  if (!d.okFileId && !d.errFileId) return "fehlt";
+  if (d.okFileId) return "io";
+  return "fehlerhaft";
+}
+
+function setupSheets() {
+  showSpinner();
+  google.script.run
+    .withSuccessHandler(msg => {
+      hideSpinner();
+      document.getElementById("indexInfo").innerText = msg;
+    })
+    .withFailureHandler(err => {
+      hideSpinner();
+      alert("Fehler: " + err.message);
+    })
+    .setupSheetsAndDemoDataWrapper();
+}
+
+function toggleImportForm() {
+  document.getElementById("importForm").classList.toggle("hidden");
+}
+
+function loadAllData(onDone) {
+  showSpinner();
+  
+  // Versuche erst Cache, dann Server
+  try {
+    const cachedData = CacheModule.getFullDatasetCached();
+    if (cachedData) {
+      hideSpinner();
+      window._FULLDATA = cachedData;
+      window.allDocs = cachedData.docs.slice();
+      buildKundenliste();
+      if (typeof onDone === "function") onDone();
+      return;
+    }
+  } catch(e) {
+    // Cache-Fehler ignorieren, weiter mit Server-Request
+  }
+
+  // Fallback: Server-Request
+  google.script.run
+    .withSuccessHandler(data => {
+      hideSpinner();
+      window._FULLDATA = data;
+      window.allDocs = data.docs.slice();
+      buildKundenliste();
+      if (typeof onDone === "function") onDone();
+    })
+    .withFailureHandler(err => {
+      hideSpinner();
+      alert("Fehler: " + err.message);
+    })
+    .loadFullDatasetWrapper();
+}
+
+function reloadAllData(cb) {
+  loadAllData(cb);
+}
+
+function buildKundenliste() {
+  const tb = document.getElementById("custTbody");
+  const arr = window._FULLDATA.customers;
+  
+  if (!arr.length) {
+    tb.innerHTML = "<tr><td colspan='3'>Keine Kunden</td></tr>";
+    return;
+  }
+
+  // Optimierte Tabellen-Aktualisierung (lokale Implementation)
+  const fragment = document.createDocumentFragment();
+  
+  // Tabelle leeren
+  tb.innerHTML = '';
+  
+  // Zeilen effizient erstellen
+  arr.forEach(k => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${k.kundeId}</td>
+      <td>${k.kname}</td>
+      <td><button onclick="openKunde('${k.kundeId}')">Öffnen</button></td>
+    `;
+    fragment.appendChild(tr);
+  });
+  
+  // Alle Zeilen auf einmal hinzufügen
+  tb.appendChild(fragment);
+}
+
+function openKunde(kundeId) {
+  if (isDirty()) {
+    saveAllLocalChanges(() => doOpenKunde(kundeId));
+  } else {
+    doOpenKunde(kundeId);
+  }
+}
+
+function doOpenKunde(kundeId) {
+  resetLocalChanges();
+  window.currentKundeId = kundeId;
+  let kunde = window._FULLDATA.customers.find(x => x.kundeId === kundeId);
+  if (!kunde) {
+    document.getElementById("kundeInfo").innerHTML = "<p>Kunde nicht gefunden.</p>";
+    showView("viewKunde");
+    return;
+  }
+  document.getElementById("kundeInfo").innerHTML = `
+    <p><strong>ID:</strong> ${kunde.kundeId}</p>
+    <p><strong>Name:</strong> ${kunde.kname}</p>
+  `;
+  let checks = window._FULLDATA.checklists.filter(ch => ch.kundeId === kundeId);
+  let tb = document.getElementById("checkTbody");
+  tb.innerHTML = "";
+  if (!checks.length) {
+    tb.innerHTML = "<tr><td colspan='3'>Keine Checklisten</td></tr>";
+  } else {
+    let html = "";
+    checks.forEach(ch => {
+      html += `
+        <tr>
+          <td>${ch.bankName}</td>
+          <td>${ch.status}</td>
+          <td><button onclick="openCheckliste('${ch.checkId}')">Öffnen</button></td>
+        </tr>
+      `;
+    });
+    tb.innerHTML = html;
+  }
+  showView("viewKunde");
+}
+
+function openCheckliste(checkId) {
+  if (isDirty()) {
+    saveAllLocalChanges(() => doOpenCheckliste(checkId));
+  } else {
+    doOpenCheckliste(checkId);
+  }
+}
+
+function doOpenCheckliste(checkId) {
+  resetLocalChanges();
+  window.currentCheckId = checkId;
+  window._UNSAVED_CHANGES.checkId = checkId;
+  let ch = window._FULLDATA.checklists.find(x => x.checkId === checkId);
+  if (!ch) {
+    document.getElementById("checkInfo").innerHTML = "<p>Checkliste nicht gefunden!</p>";
+    showView("viewCheck");
+    return;
+  }
+  document.getElementById("checklistHeader").innerText = "Checkliste " + ch.bankName;
+  document.getElementById("checkInfo").innerHTML = `
+    <p><strong>ID:</strong> ${ch.checkId}</p>
+    <p><strong>Bank:</strong> ${ch.bankName}</p>
+    <p><strong>Status:</strong> ${ch.status}</p>
+  `;
+  window.allDocs = window._FULLDATA.docs.filter(d => d.checkId === checkId);
+
+  // NEU: StateStore nur mit den Dokumenten dieser Checkliste initialisieren
+  StateStore.initSectionsFrom(window.allDocs);
+
+  applyFilter();
+  showView("viewCheck");
+}
+
+function goKunde() {
+  if (isDirty()) {
+    let data = JSON.parse(JSON.stringify(window._UNSAVED_CHANGES));
+    google.script.run
+      .withSuccessHandler(msg => { resetLocalChanges(); })
+      .withFailureHandler(err => { console.error("Speicherfehler: " + err.message); })
+      .applyLocalChangesWrapper(data);
+  }
+  showView("viewKunde");
+}
+
+function goIndex() {
+  if (isDirty()) {
+    let data = JSON.parse(JSON.stringify(window._UNSAVED_CHANGES));
+    google.script.run
+      .withSuccessHandler(msg => { resetLocalChanges(); })
+      .withFailureHandler(err => { console.error("Speicherfehler: " + err.message); })
+      .applyLocalChangesWrapper(data);
+  }
+  showView("viewIndex");
+}
+
+function saveAllLocalChanges(cb) {
+  if (!isDirty()) {
+    if (cb) cb();
+    return;
+  }
+  showSpinner();
+  let data = JSON.parse(JSON.stringify(window._UNSAVED_CHANGES));
+  google.script.run
+    .withSuccessHandler(function(msg){
+      hideSpinner();
+      resetLocalChanges();
+      if (typeof cb === "function") {
+        reloadAllData(() => {
+          openCheckliste(window.currentCheckId);
+          if (cb) cb();
+        });
+      }
+    })
+    .withFailureHandler(function(err){
+      hideSpinner();
+      alert("Fehler beim Speichern: " + err.message);
+      if (cb) cb();
+    })
+    .applyLocalChangesWrapper(data);
+}
+
+/**
+ * Optimierter Filter: Effiziente Filterung und Gruppierung mit Performance-Optimierungen
+ * Verwendet lokale DOM-Optimierungen für bessere Performance
+ */
+function applyFilter() {
+  const filterStates = {
+    fehlt: document.getElementById("cbFehlt").checked,
+    fehlerhaft: document.getElementById("cbFehlerhaft").checked,
+    io: document.getElementById("cbIo").checked,
+    hidden: document.getElementById("cbHidden").checked
+  };
+  
+  const tb = document.getElementById("docTbody");
+  
+  if (!window.allDocs.length) {
+    tb.innerHTML = "<tr><td colspan='6'>Keine Dokumente</td></tr>";
+    return;
+  }
+  
+  // Optimierte Filterung mit reduzierter Komplexität
+  const filtered = window.allDocs.filter(d => {
+    // Hidden Flag Check mit Cache
+    if (typeof window._UNSAVED_CHANGES.hiddenFlags[d.docId] !== "undefined") {
+      d.hiddenFlag = window._UNSAVED_CHANGES.hiddenFlags[d.docId];
+    }
+    
+    const status = docStatus(d);
+    
+    if (d.hiddenFlag) {
+      return filterStates.hidden;
+    }
+    
+    return (
+      (status === "fehlt" && filterStates.fehlt) ||
+      (status === "fehlerhaft" && filterStates.fehlerhaft) ||
+      (status === "io" && filterStates.io)
+    );
+  });
+  
+  // Optimierte Gruppierung mit reduzierten Objektzugriffen
+  const grouped = filtered.reduce((groups, d) => {
+    // Move-Status anwenden falls vorhanden
+    const code = window._UNSAVED_CHANGES.moves[d.docId]?.newCode || d.code;
+    d.code = code;
+    
+    if (!groups[code]) {
+      groups[code] = { code, sektion: d.sektion, docs: [] };
+    }
+    groups[code].docs.push(d);
+    return groups;
+  }, {});
+  
+  renderOldDocs(grouped);
+}
+
+/**
+ * renderOldDocs(grouped):
+ * Baut das alte Layout der Checkliste (mit allen Detailfeldern) auf.
+ */
+function renderOldDocs(grouped) {
+  let tb = document.getElementById("docTbody");
+  tb.innerHTML = "";
+  let codes = Object.keys(grouped).sort();
+  let fragment = document.createDocumentFragment();
+  codes.forEach(code => {
+    let group = grouped[code];
+    let headerTr = document.createElement("tr");
+    headerTr.classList.add("sectionHeader");
+    headerTr.innerHTML = `<td colspan='6'>${code} : ${group.sektion}</td>`;
+    fragment.appendChild(headerTr);
+    group.docs.forEach(doc => {
+      let st = docStatus(doc);
+      let icon = (st === "fehlt")
+        ? "<span style='color:#f00;'>&#10006;</span>"
+        : (st === "io")
+          ? "<span style='color:#080;'>&#10004;</span>"
+          : "<span style='color:#fa0;'>&#9651;</span>";
+      let localComment = window._UNSAVED_CHANGES.comments[doc.docId];
+      let actualComment = (typeof localComment !== "undefined") ? localComment : doc.errComment;
+      let localNotes = window._UNSAVED_CHANGES.notes[doc.docId];
+      let actualNotes = (typeof localNotes !== "undefined") ? localNotes : doc.notes;
+      
+      let docDetails = `${icon} ${buildDocLinkOrText(doc)}`;
+      if (doc.docText && doc.docText.toLowerCase().includes("jahreskontoauszug")) {
+        docDetails = `<div class="indent">${docDetails}</div>`;
+      }
+      if (actualNotes) {
+        docDetails += `<br><span id="noteDisplay_${doc.docId}" class="docNoteDisplay">${escapeHtml(actualNotes)}</span>`;
+      } else {
+        docDetails += `<br><span id="noteDisplay_${doc.docId}" class="docNoteDisplay" style="display:none;"></span>`;
+      }
+      
+      let tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${docDetails}</td>
+        <td>${buildMoveSelect(doc)}</td>
+        <td>${buildNoteToggle(doc.docId)}</td>
+        <td>${buildDropZone(doc, "ok")}</td>
+        <td>${buildDropZone(doc, "err")}</td>
+        <td>${buildHideCheckbox(doc)}</td>
+      `;
+      fragment.appendChild(tr);
+    });
+    // Hier fügen wir die Buttons hinzu:
+    let addRowBtn = document.createElement("tr");
+    let codeHtml = `<td colspan='6' style="background:#f9f9f9;">
+      <button class="outlineButton" onclick="showAddDocForm('${group.code}','${group.sektion}')">Unterlage hinzufügen</button>`;
+    // Buttons für Textbausteine einfügen, wenn der Code passt:
+    if (group.code.indexOf("04_") === 0) {
+      codeHtml += `<button class="outlineButton" onclick="openDarlehensModal('${group.code}','${group.sektion}')">Textbaustein (Darlehen)</button>`;
+    }
+    if (group.code.indexOf("01_") === 0) {
+      codeHtml += `<button class="outlineButton" onclick="openDarlehensnehmerModal('${group.code}','${group.sektion}')">Textbaustein (Darlehensnehmer)</button>`;
+    }
+    codeHtml += `
+      <div id="addForm_${group.code}" class="hidden" style="margin-top:5px;">
+        <input type="text" id="docTitle_${group.code}" placeholder="Dokumententext" style="width:60%;">
+        <button class="outlineButton" onclick="saveNewDoc('${group.code}','${group.sektion}')">OK</button>
+        <button class="outlineButton" onclick="cancelAddDoc('${group.code}')">Abbrechen</button>
+      </div>
+    </td>`;
+    addRowBtn.innerHTML = codeHtml;
+    fragment.appendChild(addRowBtn);
+  });
+  tb.appendChild(fragment);
+}
+
+/* ---- Fehlende Helper-Funktionen ---- */
+
+/**
+ * convertLinks:
+ * 1) Ersetzt Markdown-Links [Label](URL) durch <a>-Tags
+ * 2) Ersetzt plain URLs (z. B. www.xyz oder https://xyz) ebenfalls durch <a>-Tags
+ */
+function convertLinks(str) {
+  if (!str) return "";
+  
+  // Schritt 1: Markdown-Links
+  let out = str.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, url) => {
+    return `<a href="${url}" target="_blank">${label}</a>`;
+  });
+
+  // Schritt 2: Plain URLs (www.xyz oder http(s)://xyz)
+  out = out.replace(/(https?:\/\/[^\s]+|www\.[^\s]+)/g, (url) => {
+    // Falls kein http(s) am Anfang steht, ergänzen wir "http://"
+    let fullUrl = url.startsWith("http") ? url : "http://" + url;
+    return `<a href="${fullUrl}" target="_blank">${url}</a>`;
+  });
+
+  return out;
+}
+
+/**
+ * buildDocLinkOrText:
+ * - Wandelt doc.docText in klickbare Links um (Markdown und plain URLs).
+ * - Falls das Dokument eine Drive-ID hat, wird der gesamte Text auf den Drive-Link gesetzt.
+ */
+function buildDocLinkOrText(doc) {
+  let text = convertLinks(doc.docText || "");
+  let fileId = doc.okFileId || doc.errFileId;
+
+  if (!fileId) {
+    // Keine Drive-Datei => nur den Text (ggf. mit Linkify)
+    return text;
+  }
+
+  // Wenn eine Drive-Datei existiert, verlinken wir den Text auf den Drive-Link
+  let pdfUrl = "https://drive.google.com/file/d/" + fileId + "/view";
+  return `<a href="${pdfUrl}" target="_blank">${text}</a>`;
+}
+
+function convertMarkdownLinks(str) {
+  // (Optional: Du kannst diese Funktion entfernen, da sie nun nicht mehr genutzt wird.)
+  return str.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, url) =>
+    `<a href="${url}" target="_blank">${label}</a>`);
+}
+
+function buildNoteToggle(docId) {
+  return `<span id="noteToggle_${docId}" style="cursor:pointer; color:green;" onclick="toggleNoteInput('${docId}')">[+]</span>`;
+}
+
+function buildMoveSelect(doc) {
+  let allCodes = StateStore.getSections(); 
+  let arr = allCodes.filter(item => item.code !== doc.code);
+  let html = `<select id="newSection_${doc.docId}" onchange="if(this.value){storeMoveDoc('${doc.docId}', '${doc.code}', this.value);}">`;
+  html += `<option value="">-- Zielsektion wählen --</option>`;
+  arr.forEach(item => {
+    html += `<option value="${item.code}">${item.label}</option>`;
+  });
+  html += `</select>`;
+  return html;
+}
+
+function buildDropZone(doc, status) {
+  let zoneClass = (status === "ok") ? "dropZoneOk" : "dropZoneErr";
+  return `<div class="dropZone ${zoneClass}" data-docid="${doc.docId}" data-status="${status}"
+           ondragenter="dragEnter(event)" ondragleave="dragLeave(event)" ondragover="dragOver(event)" ondrop="dropFile(event)">
+           ablegen
+         </div>`;
+}
+
+function buildHideCheckbox(doc) {
+  let localVal = window._UNSAVED_CHANGES.hiddenFlags[doc.docId];
+  let actualVal = (typeof localVal !== "undefined") ? localVal : doc.hiddenFlag;
+  let c = actualVal ? "checked" : "";
+  return `<input type="checkbox" ${c} onchange="storeHiddenFlag('${doc.docId}', this.checked)"/>`;
+}
+
+function escapeHtml(str) {
+  return str ? str.replace(/</g, "&lt;").replace(/>/g, "&gt;") : "";
+}
+
+function toggleNoteInput(docId) {
+  let existingInput = document.getElementById('noteInput_' + docId);
+  let toggleButton = document.getElementById('noteToggle_' + docId);
+  if (existingInput) {
+    existingInput.remove();
+    toggleButton.innerText = '[+]';
+    return;
+  }
+  let input = document.createElement('input');
+  input.type = 'text';
+  input.id = 'noteInput_' + docId;
+  input.className = 'docNoteEdit';
+  let currentNote = window._UNSAVED_CHANGES.notes[docId] || '';
+  input.value = currentNote;
+  input.onblur = function() {
+    let val = this.value.trim();
+    storeDocNote(docId, val);
+    updateNoteDisplay(docId, val);
+    this.remove();
+    toggleButton.innerText = '[+]';
+  };
+  let noteDisplay = document.getElementById('noteDisplay_' + docId);
+  noteDisplay.parentNode.insertBefore(input, noteDisplay.nextSibling);
+  toggleButton.innerText = '[-]';
+  input.focus();
+}
+
+function storeDocNote(docId, val) {
+  window._UNSAVED_CHANGES.notes[docId] = val;
+}
+
+function updateNoteDisplay(docId, note) {
+  let noteDisplay = document.getElementById('noteDisplay_' + docId);
+  if (note) {
+    noteDisplay.innerText = note;
+    noteDisplay.style.display = 'block';
+  } else {
+    noteDisplay.innerText = '';
+    noteDisplay.style.display = 'none';
+  }
+}
+
+function storeMoveDoc(docId, oldCode, newCode) {
+  window._UNSAVED_CHANGES.moves[docId] = { newCode, oldCode };
+  let d = window.allDocs.find(x => x.docId === docId);
+  if (d) {
+    d.code = newCode;
+  }
+  StateStore.moveDoc(docId, newCode);
+  applyFilter();
+}
+
+function storeHiddenFlag(docId, newVal) {
+  window._UNSAVED_CHANGES.hiddenFlags[docId] = newVal;
+  applyFilter();
+}
+
+function showAddDocForm(code, sektion) {
+  document.getElementById("addForm_" + code).classList.remove("hidden");
+}
+
+function cancelAddDoc(code) {
+  document.getElementById("addForm_" + code).classList.add("hidden");
+}
+
+function saveNewDoc(code, sektion) {
+  let val = document.getElementById("docTitle_" + code).value.trim();
+  if (!val) {
+    alert("Bitte Titel eingeben!");
+    return;
+  }
+  let dup = window.allDocs.find(d => d.checkId === window.currentCheckId && d.code === code && d.docText === val);
+  if (dup) {
+    alert("Es existiert bereits ein Dokument mit diesem Titel! Abbruch.");
+    return;
+  }
+  let tempId = "temp_" + new Date().getTime();
+  window._UNSAVED_CHANGES.additions.push({ tempId, code, sektion, docText: val });
+  window.allDocs.push({
+    docId: tempId,
+    checkId: window.currentCheckId,
+    code,
+    sektion,
+    docText: val,
+    okFileId: "",
+    errFileId: "",
+    hiddenFlag: false,
+    errComment: "",
+    notes: "",
+    docRunNo: ""
+  });
+  document.getElementById("docTitle_" + code).value = "";
+  cancelAddDoc(code);
+  applyFilter();
+}
+
+/* ---- Ende der Helper-Funktionen ---- */
+
+/**
+ * exportAsPdf:
+ * Ruft den serverseitigen PDF-Export auf und öffnet das zurückgegebene PDF im neuen Tab.
+ */
+function exportAsPdf() {
+  showSpinner();
+
+  var filterFehlt = document.getElementById("cbFehlt").checked;
+  var filterFehlerhaft = document.getElementById("cbFehlerhaft").checked;
+  var filterIo = document.getElementById("cbIo").checked;
+  var filterHidden = document.getElementById("cbHidden").checked;
+
+  if (!window.currentCheckId) {
+    hideSpinner();
+    alert("Keine Checkliste ausgewählt.");
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideSpinner();
+      // 'result' ist das Objekt { success, fileId, url }
+      if (result && result.url) {
+        window.open(result.url, '_blank');
+      } else {
+        alert("PDF Export: Keine URL erhalten.");
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideSpinner();
+      alert("PDF Export Fehler: " + error.message);
+    })
+    .exportChecklistAsPdfWrapper(
+      window.currentCheckId,
+      filterFehlt,
+      filterFehlerhaft,
+      filterIo,
+      filterHidden
+    );
+}
+
+// Damit der Button "PDF Export" die Funktion findet:
+window.exportAsPdf = exportAsPdf;
+
+// Filter-Funktion ebenfalls global verfügbar machen:
+window.applyFilter = applyFilter;
+</script>

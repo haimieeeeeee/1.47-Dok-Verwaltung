@@ -1,0 +1,27 @@
+{
+  "scriptId": "1xcIzHliDMXBz3-rUugxHretJdbfnlBjITa3xvjfg6YrYeUKa4XC2zbpj",
+  "rootDir": "",
+  "scriptExtensions": [
+    ".js",
+    ".gs"
+  ],
+  "htmlExtensions": [
+    ".html"
+  ],
+  "jsonExtensions": [
+    ".json"
+  ],
+  "filePushOrder": [
+    "ErrorHandlingModule.js",
+    "LoggerModule.js",
+    "ConfigModule.js",
+    "DataAccessModule.js",
+    "CacheModule.js",
+    "SheetsModule.js",
+    "ChecklistModule.js",
+    "DriveModule.js",
+    "ExportModule.js",
+    "Code.js"
+  ],
+  "skipSubdirectories": false
+}

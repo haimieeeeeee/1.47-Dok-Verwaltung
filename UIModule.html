@@ -1,0 +1,53 @@
+<script>
+/**
+ * UIModule - Event-getrieben und modular.
+ * Dieses Modul abonniert die Events, die über den EventBus vom ButtonModule ausgesendet werden,
+ * und leitet sie an die entsprechenden Funktionen in den Modulen DarlehensModule und DarlehensnehmerModule weiter.
+ */
+const UIModule = (() => {
+  // Prüfe, ob der EventBus vorhanden ist.
+  if (window.EventBus) {
+    // Öffnet das Darlehen-Modal
+    window.EventBus.subscribe("openDarlehenModal", (data) => {
+      // Übergibt Code und Sektion an DarlehensModule.openForm
+      DarlehensModule.openForm(data.code, data.sektion);
+    });
+
+    // Öffnet das Darlehensnehmer-Modal
+    window.EventBus.subscribe("openDarlehensnehmerModal", (data) => {
+      DarlehensnehmerModule.openForm(data.code, data.sektion);
+    });
+
+    // Schließt das Darlehen-Modal
+    window.EventBus.subscribe("closeDarlehenModal", () => {
+      DarlehensModule.closeForm();
+    });
+
+    // Schließt das Darlehensnehmer-Modal
+    window.EventBus.subscribe("closeDarlehensnehmerModal", () => {
+      DarlehensnehmerModule.closeForm();
+    });
+
+    // Verarbeitet das Darlehen-Modal
+    window.EventBus.subscribe("processDarlehenModal", () => {
+      DarlehensModule.processForm();
+    });
+
+    // Verarbeitet das Darlehensnehmer-Modal
+    window.EventBus.subscribe("processDarlehensnehmerModal", () => {
+      DarlehensnehmerModule.processForm();
+    });
+  } else {
+    console.error("EventBus nicht gefunden. Bitte ButtonModule zuerst laden!");
+  }
+
+  // Beispiel-Funktion zur Anzeige von Nachrichten (Toast)
+  function showToast(message, title, duration) {
+    // Hier kannst du eine benutzerdefinierte Toast-Lösung integrieren.
+    // Für den Anfang verwenden wir einfach alert:
+    alert((title ? title + ": " : "") + message);
+  }
+
+  return { showToast };
+})();
+</script>

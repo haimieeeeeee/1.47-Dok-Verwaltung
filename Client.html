@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <title>Dok-Verwaltung (v1.23)</title>
+    <style>
+      /* Bestehende Styles – bitte nach Bedarf anpassen */
+      body {
+        font-family: Arial, sans-serif;
+        margin: 1rem;
+        background: #f5f7fa;
+        color: #333;
+      }
+      h2 { color: #1976d2; }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 1rem;
+      }
+      th, td {
+        border: 1px solid #ccc;
+        padding: 0.4rem;
+        vertical-align: middle;
+        text-align: left;
+      }
+      button {
+        background: #1976d2;
+        color: #fff;
+        border: none;
+        border-radius: 3px;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        margin-right: 0.5rem;
+      }
+      button:hover { background: #1565c0; }
+      .activeMode { background-color: #1565c0; border: 2px solid #0d47a1; }
+      a { color: #1976d2; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .hidden { display: none; }
+      .indent { padding-left: 20px; }
+      #docTbody tr:nth-child(odd) { background: #fcfcfc; }
+      .filterBox { margin-bottom: 1rem; border: 1px solid #ccc; padding: 0.5rem; background: #fff; }
+      .dropZone {
+        border: 2px dashed #ccc;
+        border-radius: 5px;
+        padding: 0.5rem;
+        text-align: center;
+        cursor: pointer;
+        color: #666;
+        font-size: 0.9rem;
+        display: inline-block;
+      }
+      .dropZoneOk { background-color: #e6ffe6; }
+      .dropZoneErr { background-color: #ffe6e6; }
+      .dropZone.hover { background-color: #fafafa; border-color: #333; }
+      #spinner {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 999;
+      }
+      .spinner-border {
+        width: 3rem;
+        height: 3rem;
+        border: 0.4rem solid #ccc;
+        border-top-color: #1976d2;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .modalOverlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        align-items: flex-start;
+        justify-content: center;
+        z-index: 1000;
+        padding-top: 50px;
+      }
+      .modalContent {
+        background: #fff;
+        padding: 1rem;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        min-width: 800px;
+        white-space: nowrap;
+      }
+      .modalContent h3 { margin-top: 0; }
+      .modalContent label { margin-right: 1rem; }
+      .docNoteEdit {
+        display: inline-block;
+        margin-left: 0.5rem;
+        padding: 2px 4px;
+        border: 1px solid #ccc;
+        font-size: 0.85rem;
+        border-radius: 3px;
+        width: 180px;
+      }
+      .docNoteEdit:focus { outline: 2px solid #1976d2; }
+      .docNoteDisplay { font-style: italic; color: #555; font-size: 0.9rem; }
+      .tbRow { margin-bottom: 0.5rem; }
+      .actionBar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 0.5rem 0;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+      .filterOptions, .actionButtons {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .backButton {
+        background: #1976d2;
+        color: #fff;
+        border: none;
+        border-radius: 3px;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+      }
+      .outlineButton {
+        background: none;
+        border: 1px solid #1976d2;
+        color: #1976d2;
+        padding: 0.5rem 1rem;
+        border-radius: 3px;
+        cursor: pointer;
+        margin-right: 0.5rem;
+      }
+      .outlineButton:hover { background: #1976d2; color: #fff; }
+      .sectionHeader { font-weight: bold; }
+      .highlightRow {
+        background-color: #ffff99 !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="spinner"><div class="spinner-border"></div></div>
+
+    <!-- VIEW: INDEX -->
+    <div id="viewIndex">
+      <h2>Kundenübersicht (v1.23)</h2>
+      <div id="indexInfo"></div>
+      <button onclick="setupSheets()">Tabellen anlegen</button>
+      <button onclick="toggleImportForm()">Rohdaten importieren (Parser)</button>
+      <button onclick="loadAllData(()=>showView('viewIndex'))">Kunden laden (Full-Load)</button>
+      <!-- Import-Form -->
+      <div id="importForm" class="hidden" style="border:1px solid #ccc; padding:1rem; margin:1rem 0; background:#fff;">
+        <h3>HTML-Eingabe (z. B. eHTML-Blob)</h3>
+        <textarea id="importText" style="width:100%; height:150px;"></textarea>
+        <div style="margin-top:0.5rem;">
+          <button onclick="startImport()">Parser starten + Import</button>
+          <button onclick="toggleImportForm()">Abbrechen</button>
+        </div>
+        <pre id="parserPreview" style="margin-top:1rem; border:1px solid #ccc; padding:0.5rem; white-space: pre;"></pre>
+      </div>
+      <table>
+        <thead>
+          <tr><th>KundeID</th><th>Name(n)</th><th>Aktion</th></tr>
+        </thead>
+        <tbody id="custTbody"></tbody>
+      </table>
+    </div>
+
+    <!-- VIEW: KUNDE -->
+    <div id="viewKunde" class="hidden">
+      <h2>Kundenansicht (v1.23)</h2>
+      <div id="kundeInfo"><em>...</em></div>
+      <h3>Checklisten</h3>
+      <table>
+        <thead>
+          <tr><th>Bank</th><th>Status</th><th>Aktion</th></tr>
+        </thead>
+        <tbody id="checkTbody"></tbody>
+      </table>
+      <p><button onclick="goIndex()">&larr; Zur Übersicht</button></p>
+    </div>
+
+    <!-- VIEW: CHECKLISTE -->
+    <div id="viewCheck" class="hidden">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2 id="checklistHeader">Checkliste</h2>
+        <button onclick="goKunde()" class="backButton">&larr; Zurück</button>
+      </div>
+      <div id="checkInfo"></div>
+      <div class="actionBar">
+        <div class="filterOptions">
+          <label><input type="checkbox" id="cbFehlt" checked> fehlt</label>
+          <label><input type="checkbox" id="cbFehlerhaft" checked> fehlerhaft</label>
+          <label><input type="checkbox" id="cbIo" checked> i.O.</label>
+          <label><input type="checkbox" id="cbHidden"> ausgeblendet</label>
+        </div>
+        <div class="actionButtons">
+          <button onclick="applyFilter()">Filter anwenden</button>
+          <button onclick="exportAsPdf()">PDF Export</button>
+          <button onclick="saveAllLocalChanges()">Änderungen speichern</button>
+        </div>
+      </div>
+      <table>
+        <tbody id="docTbody"></tbody>
+      </table>
+      <p><button onclick="goKunde()" class="backButton">&larr; Zur Übersicht</button></p>
+    </div>
+
+    <!-- MODAL: Textbaustein (Darlehen) -->
+    <div id="textbausteineModal_darlehen" style="display:none;">
+      <div class="modalOverlay" style="
+           position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+           background: rgba(0,0,0,0.5);
+           display: flex; align-items: flex-start; justify-content: center;
+           z-index: 1000; padding-top: 50px;">
+        <div class="modalContent" style="
+             background: #fff; padding: 1rem; border-radius: 5px;
+             min-width: 800px; white-space: nowrap;">
+          <h3>Textbausteine (Darlehen)</h3>
+          <!-- Checkbox Modernisierung -->
+          <label style="display:block; margin-bottom:0.5rem;">
+            <input type="checkbox" id="cb_modernisierung" />
+            Aufstellung der vergangenen Modernisierungsmaßnahmen
+          </label>
+
+          <!-- Buttons: +Darlehen-Block, Speichern, Abbrechen -->
+          <button id="btnAddDarlehenBlock">Darlehen-Block hinzufügen</button>
+          <button onclick="processTextbausteineModal_darlehen()">Speichern</button>
+          <button onclick="closeDarlehensModal()">Abbrechen</button>
+
+          <hr>
+          <!-- Container für die dynamischen Darlehensblöcke -->
+          <div id="darlehenContainer"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: Textbaustein (Darlehensnehmer) -->
+    <div id="textbausteineModal_darlehensnehmer" style="display:none;">
+      <div class="modalOverlay" style="
+           position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+           background: rgba(0,0,0,0.5);
+           display: flex; align-items: flex-start; justify-content: center;
+           z-index: 1000; padding-top: 50px;">
+        <div class="modalContent" style="
+             background: #fff; padding: 1rem; border-radius: 5px;
+             min-width: 800px; white-space: nowrap;">
+          <h3>Textbausteine (Darlehensnehmer)</h3>
+
+          <!-- Checkboxes und Felder, die das DarlehensnehmerModule per querySelector sucht -->
+          <label style="display:block;">
+            <input type="checkbox" id="cb_aufenthaltstitel" />
+            Aufenthaltstitel
+          </label>
+          <label style="display:block;">
+            <input type="checkbox" id="cb_arbeitsvertrag" />
+            Arbeitsvertrag
+          </label>
+          <label style="display:block;">
+            <input type="checkbox" id="cb_arbeitsvertrag_nebenjob" />
+            Arbeitsvertrag Nebenjob
+          </label>
+          <label style="display:block;">
+            <input type="checkbox" id="cb_lohn_gehalt_nebenjob" />
+            Lohn-/Gehaltsabrechnung Nebenjob (letzte 3 Monate)
+          </label>
+          <label style="display:block; margin-top:0.5rem;">
+            <input type="checkbox" id="cb_lohn_gehalt_dezember" />
+            Lohn-/und Gehaltsabrechnung Dezember
+            <input type="text" id="input_dezember" placeholder="Jahr" style="margin-left:1rem;">
+          </label>
+          <label style="display:block; margin-top:0.5rem;">
+            <input type="checkbox" id="cb_private_krankenversicherung" />
+            Private Krankenversicherung: aktueller Beitragsbescheid
+          </label>
+          <label style="display:block; margin-top:0.5rem;">
+            <input type="checkbox" id="cb_lohnsteuerbescheinigung" />
+            Elektronische Lohnsteuerbescheinigung
+            <input type="text" id="input_lohnsteuer" placeholder="Jahr" style="margin-left:1rem;">
+          </label>
+          <label style="display:block; margin-top:0.5rem;">
+            <input type="checkbox" id="cb_konto_1" />
+            Kontoauszug 1
+            <input type="text" id="inp_konto_1" placeholder="Konto" style="margin-left:1rem;">
+          </label>
+          <label style="display:block; margin-top:0.5rem;">
+            <input type="checkbox" id="cb_konto_2" />
+            Kontoauszug 2
+            <input type="text" id="inp_konto_2" placeholder="Konto" style="margin-left:1rem;">
+          </label>
+          <label style="display:block; margin-top:0.5rem;">
+            <input type="checkbox" id="cb_konto_3" />
+            Kontoauszug 3
+            <input type="text" id="inp_konto_3" placeholder="Konto" style="margin-left:1rem;">
+          </label>
+
+          <!-- Buttons, die über globale Funktionen den EventBus anstoßen -->
+          <br>
+          <button onclick="processTextbausteineModal_darlehensnehmer()">Speichern</button>
+          <button onclick="closeDarlehensnehmerModal()">Abbrechen</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Skript-Module einbinden in folgender Reihenfolge -->
+    <?!= include("ModalManager") ?>
+    <?!= include("ButtonModule") ?>
+    <!-- Alle JS-Module (WrapperModule, DOMUtils, CacheModule) sind jetzt direkt in Code.js integriert -->
+    <?!= include("DarlehensModule") ?>
+    <?!= include("DarlehensModule") ?>
+    <?!= include("DarlehensnehmerModule") ?>
+    <?!= include("UIModule") ?>
+    <?!= include("ParserModule") ?>
+    <?!= include("StateStore") ?>
+    <?!= include("ClientController") ?>
+
+  </body>
+</html>

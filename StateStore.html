@@ -1,0 +1,123 @@
+<script>
+/***************************************************
+ * StateStore - Enhanced Version
+ * Zentraler State-Store für Sektionen und Dokumentbewegungen.
+ * Verwaltet ein Array von Code/Label-Paaren und benachrichtigt
+ * registrierte Listener bei Änderungen.
+ ***************************************************/
+const StateStore = (() => {
+  // Internes Array, das die Codes und zugehörigen Labels hält.
+  let codes = [];
+
+  // Liste der Observer (Listener), die über Änderungen informiert werden.
+  let listeners = [];
+
+  /**
+   * compareDocs: Sortierfunktion, die zunächst nach Code sortiert.
+   * Bei Code "04_01" werden Dokumente bevorzugt, deren Sektion "straße" oder "stuttgart" enthält.
+   */
+  function compareDocs(a, b) {
+    const codeCompare = String(a.code).localeCompare(String(b.code));
+    if (codeCompare !== 0) return codeCompare;
+
+    // Falls du die Spezialbehandlung NICHT mehr brauchst, kannst du diesen Block entfernen.
+    if (a.code === "04_01") {
+      const aAddr = /straße|stuttgart/i.test(a.sektion || "");
+      const bAddr = /straße|stuttgart/i.test(b.sektion || "");
+      if (aAddr && !bAddr) return -1;
+      if (!aAddr && bAddr) return 1;
+    }
+    return 0;
+  }
+
+  /**
+   * initSectionsFrom: Initialisiert das interne codes-Array anhand eines
+   * Arrays von Dokumenten. Für jeden Code wird der erste gefundene Sektionstext
+   * übernommen und als Label im Format "CODE (Sektion)" gespeichert.
+   * Zusätzlich wird der Eintrag für "03_01 (Bonitätsunterlagen)" immer sichergestellt.
+   */
+  function initSectionsFrom(docs) {
+    // Sortiere die Dokumente, um bei "04_01" bevorzugt Adress-Dokumente zu erhalten.
+    docs.sort(compareDocs);
+
+    const codeMap = {};
+    docs.forEach(d => {
+      if (d.code && !codeMap[d.code]) {
+        codeMap[d.code] = d.sektion || "";
+      }
+    });
+
+    // Erzeuge ein Array aus dem codeMap.
+    const arr = [];
+    Object.keys(codeMap).forEach(code => {
+      const sektion = codeMap[code] || "";
+      const label = code + (sektion ? ` (${sektion})` : ` ()`);
+      arr.push({ code, label, sektion });
+    });
+
+    // Stelle sicher, dass der Eintrag für "03_01" existiert – falls ja, aktualisiere ihn.
+    let found = arr.find(item => item.code === "03_01");
+    if (!found) {
+      arr.push({ code: "03_01", label: "03_01 (Bonitätsunterlagen)", sektion: "Bonitätsunterlagen" });
+    } else {
+      found.label = "03_01 (Bonitätsunterlagen)";
+      found.sektion = "Bonitätsunterlagen";
+    }
+
+    // Sortiere nach Code.
+    arr.sort((a, b) => a.code.localeCompare(b.code));
+    codes = arr;
+    notify();
+  }
+
+  /**
+   * getSections: Gibt das aktuell verwaltete Array an Code/Label-Paaren zurück.
+   */
+  function getSections() {
+    return codes;
+  }
+
+  /**
+   * moveDoc: Falls ein neuer Code auftaucht, wird er hinzugefügt.
+   * Dabei wird als Label zunächst "newCode ()" gesetzt.
+   */
+  function moveDoc(docId, newCode) {
+    if (newCode && !codes.find(item => item.code === newCode)) {
+      codes.push({ code: newCode, label: newCode + " ()", sektion: "" });
+      codes.sort((a, b) => a.code.localeCompare(b.code));
+      notify();
+    }
+  }
+
+  /**
+   * subscribe: Ermöglicht es externen Funktionen, sich als Listener zu registrieren,
+   * sodass sie bei Änderungen am StateStore benachrichtigt werden.
+   */
+  function subscribe(callback) {
+    if (typeof callback === "function") {
+      listeners.push(callback);
+    }
+  }
+
+  /**
+   * notify: Ruft alle registrierten Listener auf und übergibt das aktuelle codes-Array.
+   */
+  function notify() {
+    listeners.forEach(fn => {
+      try {
+        fn(codes);
+      } catch (e) {
+        LoggerModule.logError("Fehler im StateStore Listener: " + e);
+      }
+    });
+  }
+
+  // Exponierte Methoden
+  return {
+    initSectionsFrom,
+    getSections,
+    moveDoc,
+    subscribe
+  };
+})();
+</script>

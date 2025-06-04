@@ -1,0 +1,256 @@
+<script>
+const ImprovedParserModule = (() => {
+
+  // Extrahiert den Text aus einem <topdoc-unterlage>-Element,
+  // entfernt z. B. "Aktionen anzeigen" und "Keine Einträge vorhanden".
+  const extractDocTextFromUnderlage = (el) => {
+    const span = el.querySelector("span.text");
+    if (!span) return "";
+    let txt = span.textContent.split("Aktionen anzeigen")[0].trim();
+    txt = txt.replace(/Keine Einträge vorhanden/gi, "").trim();
+    txt = txt.replace(/\s+/g, " ");
+    // Links in Markdown umwandeln:
+    const links = Array.from(el.querySelectorAll("a")).map(a => {
+      const href = a.getAttribute("href") || "#";
+      const label = a.textContent.trim() || "Dokument öffnen";
+      return `[${label}](${href})`;
+    });
+    if (links.length) {
+      txt += " " + links.join(" ");
+    }
+    return txt;
+  };
+
+  // Liest alle <topdoc-unterlage> in einem <ul> aus.
+  const parseDocumentsFromUl = (ulElem) => {
+    if (!ulElem || ulElem.tagName !== "UL") return [];
+    return Array.from(ulElem.querySelectorAll("topdoc-unterlage"))
+      .map(u => extractDocTextFromUnderlage(u))
+      .filter(txt => txt.length > 0);
+  };
+
+  // Transformiert Dokumententitel nach Regeln (z. B. Verschieben in 03_01 bei Einkommensteuerbescheid).
+  const transformDocTitle = (docText, sectionCode, origin, manualCheckMap) => {
+    const out = [];
+    // Beispiel-Regel: Lohn-/Gehaltsabrechnungen der letzten 3 Monate
+    if (/lohn-\/.*gehaltsabrechnungen der letzten 3 monate/i.test(docText)) {
+      getLast3Months().forEach(m => {
+        out.push("Lohn-/ und Gehaltsabrechnung Dez. letzten Jahres");
+        out.push("Lohn-/ und Gehaltsabrechnungen " + m);
+      });
+      return out;
+    }
+    // Einkommensteuer -> verschiebe zu 03_01
+    if (/(einkommensteuerbescheid|einkommensteuererklärung)/i.test(docText)) {
+      out.push({ moveTo: "03_01", text: docText });
+      return out;
+    }
+    // Selbstauskunft + SCHUFA -> verschiebe zu 06_01
+    if (/selbstauskunft.*schufa/i.test(docText)) {
+      out.push({ moveTo: "06_01", text: docText });
+      return out;
+    }
+    // Lichtbilder in Sektion 04 -> Innen-/Außenaufnahmen aufsplitten
+    if (sectionCode.startsWith("04_") && /aktuelle lichtbilder.*innen.*außen/i.test(docText)) {
+      out.push("Innenaufnahmen des Objekts (3-4 Fotos)");
+      out.push("Außenaufnahmen des Objekts (3-4 Fotos)");
+      return out;
+    }
+    // Standard: Unverändert zurückgeben
+    out.push(docText);
+    return out;
+  };
+
+  // Liefert die letzten 3 Monate im Format "Monat Jahr".
+  const getLast3Months = () => {
+    const now = new Date();
+    return Array.from({ length: 3 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (i + 1), 1);
+      return getGermanMonth(d.getMonth()) + " " + d.getFullYear();
+    });
+  };
+
+  // Liefert den deutschen Monatsnamen.
+  const getGermanMonth = (m) => {
+    const mm = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+    return mm[m] || "Unbekannt";
+  };
+
+  const startImport = () => {
+    const rawHtml = document.getElementById("importText").value.trim();
+    if (!rawHtml) {
+      alert("Keine HTML-Daten!");
+      return;
+    }
+    const domParser = new DOMParser();
+    const doc = domParser.parseFromString(rawHtml, "text/html");
+    const groups = doc.querySelectorAll("topdoc-bezugsobjektgruppe");
+    if (!groups.length) {
+      alert("Keine Bezugsobjektgruppen gefunden!");
+      return;
+    }
+
+    const personSections = [];
+    const objectSections = [];
+    let bankDocs = [];
+    let allgDocs = [];
+    let bankName = "";
+
+    groups.forEach(group => {
+      const header = group.querySelector("h2.header-bezugsobjektgruppe");
+      if (!header) return;
+      const title = header.textContent.trim();
+      const ul = group.querySelector("ul");
+      if (!ul) return;
+      const rawDocs = parseDocumentsFromUl(ul);
+      if (title.startsWith("Persönliche Unterlagen zu")) {
+        personSections.push({ title, docs: rawDocs });
+      } else if (title.startsWith("Unterlagen zur Immobilie")) {
+        const st = title.replace("Unterlagen zur Immobilie", "").trim();
+        objectSections.push({ title: st, docs: rawDocs });
+      } else if (title.startsWith("Weitere Unterlagen für")) {
+        bankDocs.push(...rawDocs);
+        bankName = title.replace("Weitere Unterlagen für", "").trim();
+      } else {
+        allgDocs.push(...rawDocs);
+      }
+    });
+
+    if (!bankName) bankName = "Unbekannte Bank";
+    let boniDocs = [];
+    const manualCheckMap = {};
+
+    const transformArray = (secArray, baseCode) => {
+      secArray.forEach((sec, idx) => {
+        const code = baseCode + "_0" + (idx + 1);
+        let newDocs = [];
+        sec.docs.forEach(d => {
+          const transformed = transformDocTitle(d, code, sec.title, manualCheckMap);
+          transformed.forEach(x => {
+            if (typeof x === "object" && x.moveTo) {
+              if (x.moveTo === "03_01") {
+                boniDocs.push(x.text);
+              } else if (x.moveTo === "06_01") {
+                allgDocs.push(x.text);
+              } else if (x.moveTo === "05_01") {
+                bankDocs.push(x.text);
+              }
+            } else {
+              newDocs.push(x);
+            }
+          });
+        });
+        sec.docs = newDocs;
+      });
+    };
+
+    transformArray(personSections, "01");
+    transformArray(objectSections, "04");
+
+    // Doppelte entfernen
+    const removeDuplicates = (arr) => Array.from(new Set(arr));
+
+    const documents = [];
+    const person1 = personSections[0]
+      ? personSections[0].title.replace("Persönliche Unterlagen zu", "").trim()
+      : "";
+    const person2 = personSections[1]
+      ? personSections[1].title.replace("Persönliche Unterlagen zu", "").trim()
+      : "";
+
+    // Person-Abschnitte
+    personSections.forEach((sec, idx) => {
+      const code = "01_0" + (idx + 1);
+      removeDuplicates(sec.docs).forEach(d => {
+        documents.push({ code, section: sec.title, text: d });
+      });
+    });
+
+    // Bonitätsunterlagen
+    removeDuplicates(boniDocs).forEach(d => {
+      documents.push({ code: "03_01", section: "Bonitätsunterlagen", text: d });
+    });
+
+    // Objektunterlagen
+    objectSections.forEach((sec, idx) => {
+      const code = "04_0" + (idx + 1);
+      removeDuplicates(sec.docs).forEach(d => {
+        documents.push({ code, section: sec.title, text: d });
+      });
+    });
+
+    // Bank-Unterlagen
+    const newBank = [];
+    bankDocs.forEach(d => {
+      const transformed = transformDocTitle(d, "05_x", "Weitere Unterlagen " + bankName, manualCheckMap);
+      transformed.forEach(x => {
+        if (typeof x === "object" && x.moveTo) {
+          if (x.moveTo === "03_01") {
+            boniDocs.push(x.text);
+          } else if (x.moveTo === "06_01") {
+            allgDocs.push(x.text);
+          } else {
+            newBank.push(x.text);
+          }
+        } else {
+          newBank.push(x);
+        }
+      });
+    });
+    bankDocs = newBank;
+    removeDuplicates(bankDocs).forEach(d => {
+      documents.push({ code: "05_01", section: "Weitere Unterlagen " + bankName, text: d });
+    });
+
+    // Allgemein
+    const newAllg = [];
+    allgDocs.forEach(d => {
+      const transformed = transformDocTitle(d, "06_x", "(allgemein)", manualCheckMap);
+      transformed.forEach(x => {
+        if (typeof x === "object" && x.moveTo) {
+          if (x.moveTo === "03_01") {
+            boniDocs.push(x.text);
+          } else if (x.moveTo === "05_01") {
+            bankDocs.push(x.text);
+          } else {
+            newAllg.push(x.text);
+          }
+        } else {
+          newAllg.push(x);
+        }
+      });
+    });
+    allgDocs = newAllg;
+    removeDuplicates(allgDocs).forEach(d => {
+      documents.push({ code: "06_01", section: "(allgemein)", text: d });
+    });
+
+    // Vorschau
+    const preview = [];
+    preview.push("Gruppen gefunden: " + groups.length + "  Bank: " + bankName);
+    preview.push("Person1: " + person1 + "  Person2: " + person2);
+    preview.push("Dokumente:");
+    documents.forEach(d => {
+      preview.push(d.code + " => " + d.text);
+    });
+    document.getElementById("parserPreview").textContent = preview.join("\n");
+
+    // An Server schicken
+    const parsedData = { person1, person2, bankName, documents };
+    google.script.run
+      .withSuccessHandler(msg => {
+        alert(msg);
+        toggleImportForm();
+        reloadAllData(() => showView("viewIndex"));
+      })
+      .withFailureHandler(err => {
+        alert("Fehler beim Import: " + err.message);
+      })
+      .handleImportRohdatenWrapper(parsedData);
+  };
+
+  return { startImport };
+})();
+
+// Globale Zuordnung in ClientController.html: window.startImport = ImprovedParserModule.startImport;
+</script>

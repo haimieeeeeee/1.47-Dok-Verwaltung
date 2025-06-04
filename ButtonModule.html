@@ -1,0 +1,59 @@
+<script>
+  /**
+   * ButtonModule: Dieses Modul zentralisiert die Button-Logik und stellt globale Wrapper-Funktionen bereit,
+   * die nun Ereignisse über einen zentralen EventBus auslösen, anstatt direkt UIModule-Funktionen aufzurufen.
+   */
+  (function(global) {
+    // Sicherstellen, dass ein globaler EventBus existiert.
+    if (!global.EventBus) {
+      global.EventBus = (function(){
+        const events = {};
+        return {
+          subscribe: function(event, callback) {
+            if (!events[event]) events[event] = [];
+            events[event].push(callback);
+          },
+          publish: function(event, data) {
+            if (events[event]) {
+              events[event].forEach(function(callback){
+                callback(data);
+              });
+            }
+          }
+        };
+      })();
+    }
+
+    // Öffnet das Darlehen-Modal über den EventBus.
+    global.openDarlehensModal = function(code, sektion) {
+      global.EventBus.publish("openDarlehenModal", { code: code, sektion: sektion });
+    };
+
+    // Öffnet das Darlehensnehmer-Modal über den EventBus.
+    global.openDarlehensnehmerModal = function(code, sektion) {
+      global.EventBus.publish("openDarlehensnehmerModal", { code: code, sektion: sektion });
+    };
+
+    // Schließt das Darlehen-Modal.
+    global.closeDarlehensModal = function() {
+      global.EventBus.publish("closeDarlehenModal", {});
+    };
+
+    // Schließt das Darlehensnehmer-Modal.
+    global.closeDarlehensnehmerModal = function() {
+      global.EventBus.publish("closeDarlehensnehmerModal", {});
+    };
+
+    // Verarbeitet die Eingaben im Darlehen-Modal und schließt es.
+    global.processTextbausteineModal_darlehen = function() {
+      global.EventBus.publish("processDarlehenModal", {});
+    };
+
+    // Verarbeitet die Eingaben im Darlehensnehmer-Modal und schließt es.
+    global.processTextbausteineModal_darlehensnehmer = function() {
+      global.EventBus.publish("processDarlehensnehmerModal", {});
+    };
+
+    // Hier können bei Bedarf weitere globale Button-Funktionen ergänzt werden.
+  })(this);
+</script>

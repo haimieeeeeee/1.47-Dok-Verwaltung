@@ -1,0 +1,58 @@
+<!-- ModalManager.html -->
+<script>
+(function() {
+  // Ermittelt den globalen Kontext (window, self oder this)
+  var global = (typeof window !== "undefined") ? window : (typeof self !== "undefined" ? self : this);
+  var modals = {};
+
+  function createModalIfMissing(modalId, defaultContent) {
+    var modal = global.document.getElementById(modalId);
+    if (!modal) {
+      modal = global.document.createElement("div");
+      modal.id = modalId;
+      modal.style.display = "none";
+      modal.innerHTML = '<div class="modalOverlay" style="position:fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;">' +
+                        '<div class="modalContent" style="background: #fff; padding: 1rem; border-radius: 4px;">' +
+                        (defaultContent || "") +
+                        '</div></div>';
+      global.document.body.appendChild(modal);
+    }
+    modals[modalId] = modal;
+    return modal;
+  }
+
+  function getModal(modalId) {
+    if (!modals[modalId]) {
+      createModalIfMissing(modalId, "");
+    }
+    return modals[modalId];
+  }
+
+  function openModal(modalId) {
+    var modal = getModal(modalId);
+    modal.style.display = "flex";
+  }
+
+  function closeModal(modalId) {
+    var modal = getModal(modalId);
+    modal.style.display = "none";
+  }
+
+  function updateModalContent(modalId, content) {
+    var modal = getModal(modalId);
+    var contentContainer = modal.querySelector(".modalContent");
+    if (contentContainer) {
+      contentContainer.innerHTML = content;
+    }
+  }
+
+  // Hänge ModalManager im globalen Kontext an.
+  global.ModalManager = {
+    createModalIfMissing: createModalIfMissing,
+    getModal: getModal,
+    openModal: openModal,
+    closeModal: closeModal,
+    updateModalContent: updateModalContent
+  };
+})();
+</script>

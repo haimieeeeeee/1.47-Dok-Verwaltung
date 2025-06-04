@@ -1,0 +1,65 @@
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // Tabellen anlegen
+  const btnSetupSheets = document.getElementById("btnSetupSheets");
+  if (btnSetupSheets) {
+    btnSetupSheets.addEventListener("click", function() {
+      setupSheets();
+    });
+  }
+
+  // Rohdaten importieren (Parser)
+  const btnToggleImport = document.getElementById("btnToggleImport");
+  if (btnToggleImport) {
+    btnToggleImport.addEventListener("click", function() {
+      toggleImportForm();
+    });
+  }
+
+  // Kunden laden (Full-Load)
+  const btnLoadData = document.getElementById("btnLoadData");
+  if (btnLoadData) {
+    btnLoadData.addEventListener("click", function() {
+      loadAllData(() => showView("viewIndex"));
+    });
+  }
+
+  // Parser starten
+  const btnStartImport = document.getElementById("btnStartImport");
+  if (btnStartImport) {
+    btnStartImport.addEventListener("click", function() {
+      ParserModule.startImport();
+    });
+  }
+
+  // Parser-Abbrechen
+  const btnCancelImport = document.getElementById("btnCancelImport");
+  if (btnCancelImport) {
+    btnCancelImport.addEventListener("click", function() {
+      toggleImportForm();
+    });
+  }
+
+  // Weitere Event-Listener, z. B. für "Zurück zur Übersicht" oder "Export PDF", falls vorhanden:
+  const btnGoIndex = document.getElementById("btnGoIndex");
+  if (btnGoIndex) {
+    btnGoIndex.addEventListener("click", function() {
+      goIndex();
+    });
+  }
+
+  const btnGoKunde = document.getElementById("btnGoKunde");
+  if (btnGoKunde) {
+    btnGoKunde.addEventListener("click", function() {
+      goKunde();
+    });
+  }
+
+  const btnExportPdf = document.getElementById("btnExportPdf");
+  if (btnExportPdf) {
+    btnExportPdf.addEventListener("click", function() {
+      exportAsPdf();
+    });
+  }
+});
+</script>

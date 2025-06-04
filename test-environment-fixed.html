@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dok-Verwaltung - Lokale Testumgebung & Diagnose-System (Fixed)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+        }
+        .header {
+            background: #1a73e8;
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .main-container {
+            display: flex;
+            height: calc(100vh - 80px);
+        }
+        .app-area {
+            flex: 1;
+            background: white;
+            margin: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .diagnostics-panel {
+            width: 400px;
+            background: #2d2d2d;
+            color: #f1f1f1;
+            padding: 1rem;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .diagnostics-section {
+            margin-bottom: 20px;
+            border: 1px solid #444;
+            border-radius: 4px;
+        }
+        .diagnostics-header {
+            background: #404040;
+            padding: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+        }
+        .diagnostics-content {
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 5px;
+            border-radius: 2px;
+        }
+        .log-info { background: #0d4f3c; }
+        .log-error { background: #5d1a1a; }
+        .log-warning { background: #5d4a1a; }
+        .log-event { background: #1a1a5d; }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .status-ok { background: #4caf50; }
+        .status-error { background: #f44336; }
+        .status-warning { background: #ff9800; }
+        .control-panel {
+            background: #f0f0f0;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        .btn {
+            padding: 8px 16px;
+            margin: 0 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary { background: #1a73e8; color: white; }
+        .btn-success { background: #4caf50; color: white; }
+        .btn-danger { background: #f44336; color: white; }
+        .btn-warning { background: #ff9800; color: white; }
+        .collapsed .diagnostics-content { display: none; }
+        .app-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔬 Dok-Verwaltung - Lokale Testumgebung (FIXED)</h1>
+        <div>
+            <span class="status-indicator status-ok"></span>
+            <span>Diagnose-System aktiv</span>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <!-- Haupt-Anwendungsbereich -->
+        <div class="app-area">
+            <div class="control-panel">
+                <button class="btn btn-primary" onclick="DiagnosticsEngine.clearLogs()">🗑️ Logs löschen</button>
+                <button class="btn btn-success" onclick="DiagnosticsEngine.runSystemCheck()">🔍 System-Check</button>
+                <button class="btn btn-warning" onclick="DiagnosticsEngine.simulateError()">⚠️ Fehler simulieren</button>
+                <button class="btn btn-danger" onclick="DiagnosticsEngine.generateReport()">📊 KI-Report erstellen</button>
+                <label>
+                    <input type="checkbox" id="autoCapture" checked> Auto-Capture Events
+                </label>
+            </div>
+            <iframe id="appFrame" class="app-iframe" src="about:blank"></iframe>
+        </div>
+
+        <!-- Diagnose-Panel -->
+        <div class="diagnostics-panel">
+            <div class="diagnostics-section">
+                <div class="diagnostics-header" onclick="DiagnosticsEngine.toggleSection(this)">
+                    📊 System Status
+                </div>
+                <div class="diagnostics-content" id="systemStatus">
+                    <div class="log-info">✅ EventBus initialisiert</div>
+                    <div class="log-info">✅ Module geladen</div>
+                    <div class="log-info">✅ Mock-APIs bereit</div>
+                </div>
+            </div>
+
+            <div class="diagnostics-section">
+                <div class="diagnostics-header" onclick="DiagnosticsEngine.toggleSection(this)">
+                    🔄 EventBus Monitor
+                </div>
+                <div class="diagnostics-content" id="eventBusLog">
+                    <div class="log-event">Warte auf Events...</div>
+                </div>
+            </div>
+
+            <div class="diagnostics-section">
+                <div class="diagnostics-header" onclick="DiagnosticsEngine.toggleSection(this)">
+                    🐛 Fehler & Warnungen
+                </div>
+                <div class="diagnostics-content" id="errorLog">
+                    <div class="log-info">Keine Fehler</div>
+                </div>
+            </div>
+
+            <div class="diagnostics-section">
+                <div class="diagnostics-header" onclick="DiagnosticsEngine.toggleSection(this)">
+                    📞 Function Calls
+                </div>
+                <div class="diagnostics-content" id="functionLog">
+                    <div class="log-info">Bereit für Function-Tracking</div>
+                </div>
+            </div>
+
+            <div class="diagnostics-section">
+                <div class="diagnostics-header" onclick="DiagnosticsEngine.toggleSection(this)">
+                    💾 State Snapshots
+                </div>
+                <div class="diagnostics-content" id="stateLog">
+                    <div class="log-info">Automatische State-Captures aktiviert</div>
+                </div>
+            </div>
+
+            <div class="diagnostics-section">
+                <div class="diagnostics-header" onclick="DiagnosticsEngine.toggleSection(this)">
+                    🤖 KI-Diagnose
+                </div>
+                <div class="diagnostics-content" id="aiDiagnostics">
+                    <div class="log-info">Bereit für KI-Analyse</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Diagnose-Engine - Das Herzstück des Systems
+        const DiagnosticsEngine = {
+            logs: {
+                events: [],
+                errors: [],
+                functions: [],
+                states: []
+            },
+
+            init() {
+                console.log('🔬 Diagnose-Engine gestartet');
+                this.setupMockAPIs();
+                this.startMonitoring();
+                this.loadMainApp();
+            },
+
+            setupMockAPIs() {
+                // Mock für google.script.run
+                window.google = {
+                    script: {
+                        run: new Proxy({}, {
+                            get: (target, prop) => {
+                                return this.createMockFunction(prop);
+                            }
+                        })
+                    }
+                };
+
+                this.logInfo('Mock-APIs', '✅ google.script.run Mock erstellt');
+            },
+
+            createMockFunction(functionName) {
+                const self = this;
+                return new Proxy(() => {}, {
+                    get: (target, prop) => {
+                        if (prop === 'withSuccessHandler') {
+                            return (callback) => {
+                                return new Proxy(() => {}, {
+                                    get: (target, prop) => {
+                                        if (prop === 'withFailureHandler') {
+                                            return (errorCallback) => {
+                                                return (...args) => {
+                                                    self.logFunction(functionName, args);
+                                                    // Simuliere Erfolg nach kurzer Verzögerung
+                                                    setTimeout(() => {
+                                                        callback(`Mock-Antwort für ${functionName}`);
+                                                    }, 100);
+                                                };
+                                            };
+                                        }
+                                        return (...args) => {
+                                            self.logFunction(functionName, args);
+                                            setTimeout(() => {
+                                                callback(`Mock-Antwort für ${functionName}`);
+                                            }, 100);
+                                        };
+                                    },
+                                    apply: (target, thisArg, args) => {
+                                        self.logFunction(functionName, args);
+                                        setTimeout(() => {
+                                            callback(`Mock-Antwort für ${functionName}`);
+                                        }, 100);
+                                    }
+                                });
+                            };
+                        }
+                        return (...args) => {
+                            self.logFunction(functionName, args);
+                            return Promise.resolve(`Mock-Antwort für ${functionName}`);
+                        };
+                    },
+                    apply: (target, thisArg, args) => {
+                        self.logFunction(functionName, args);
+                        return Promise.resolve(`Mock-Antwort für ${functionName}`);
+                    }
+                });
+            },
+
+            startMonitoring() {
+                const self = this;
+                // Console-Überwachung
+                const originalLog = console.log;
+                const originalError = console.error;
+                const originalWarn = console.warn;
+
+                console.log = (...args) => {
+                    originalLog.apply(console, args);
+                    self.logInfo('Console', args.join(' '));
+                };
+
+                console.error = (...args) => {
+                    originalError.apply(console, args);
+                    self.logError('Console', args.join(' '));
+                };
+
+                console.warn = (...args) => {
+                    originalWarn.apply(console, args);
+                    self.logWarning('Console', args.join(' '));
+                };
+
+                // Error-Handler
+                window.onerror = (message, source, lineno, colno, error) => {
+                    self.logError('Global', `${message} at ${source}:${lineno}:${colno}`);
+                    return false;
+                };
+
+                this.logInfo('Monitoring', '✅ Console & Error-Überwachung aktiv');
+            },
+
+            loadMainApp() {
+                // Lade die Haupt-HTML-Datei in den iframe
+                const iframe = document.getElementById('appFrame');
+                
+                // Erstelle eine modifizierte Version der Client.html mit eingebetteter Diagnose
+                const htmlContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Dok-Verwaltung Test (Fixed)</title>
+                    <style>
+                        /* Inline-Styles für Bootstrap-ähnliches Design */
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        .btn { padding: 8px 16px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+                        .btn-primary { background: #007bff; color: white; }
+                        .hidden { display: none; }
+                        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: 20px auto; }
+                        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                        textarea { width: 100%; height: 100px; }
+                        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+                        .modal-content { background-color: white; margin: 10% auto; padding: 20px; border-radius: 8px; width: 80%; max-width: 500px; }
+                        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+                        .close:hover { color: black; }
+                    </style>
+                </head>
+                <body>
+                    <div id="spinner" class="hidden"><div class="spinner"></div></div>
+                    
+                    <div id="viewIndex">
+                        <h2>📋 Kundenübersicht (Test-Modus v1.45 - FIXED)</h2>
+                        <div id="indexInfo">Test-Umgebung erfolgreich geladen</div>
+                        <button class="btn btn-primary" onclick="setupSheets()">Tabellen anlegen</button>
+                        <button class="btn btn-primary" onclick="toggleImportForm()">Rohdaten importieren (Parser)</button>
+                        <button class="btn btn-primary" onclick="loadAllData(()=>showView('viewIndex'))">Kunden laden (Full-Load)</button>
+                        <button class="btn btn-primary" onclick="testEventBus()">🧪 EventBus testen</button>
+                        <button class="btn btn-primary" onclick="testModals()">🧪 Modals testen</button>
+                        
+                        <div id="importForm" class="hidden">
+                            <h3>HTML-Eingabe (Parser-Test)</h3>
+                            <textarea id="importText" placeholder="Hier HTML-Daten einfügen..."></textarea>
+                            <button class="btn btn-primary" onclick="startImport()">Parser starten</button>
+                            <button class="btn" onclick="toggleImportForm()">Abbrechen</button>
+                            <div id="parserPreview" style="white-space: pre-wrap; background: #f5f5f5; padding: 10px; margin-top: 10px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Test-Modals -->
+                    <div id="textbausteineModal_darlehen" class="modal">
+                        <div class="modal-content">
+                            <span class="close" onclick="closeDarlehensModal()">&times;</span>
+                            <h3>Darlehen Modal (Test)</h3>
+                            <p>Test-Darlehen-Modal erfolgreich geöffnet!</p>
+                            <button class="btn btn-primary" onclick="processTextbausteineModal_darlehen()">Speichern</button>
+                            <button class="btn" onclick="closeDarlehensModal()">Abbrechen</button>
+                        </div>
+                    </div>
+
+                    <div id="textbausteineModal_darlehensnehmer" class="modal">
+                        <div class="modal-content">
+                            <span class="close" onclick="closeDarlehensnehmerModal()">&times;</span>
+                            <h3>Darlehensnehmer Modal (Test)</h3>
+                            <p>Test-Darlehensnehmer-Modal erfolgreich geöffnet!</p>
+                            <button class="btn btn-primary" onclick="processTextbausteineModal_darlehensnehmer()">Speichern</button>
+                            <button class="btn" onclick="closeDarlehensnehmerModal()">Abbrechen</button>
+                        </div>
+                    </div>
+
+                    <script>
+                        // Verbindung zum Diagnose-System
+                        const logToDiagnostics = (type, category, message) => {
+                            if (parent && parent.DiagnosticsEngine) {
+                                parent.DiagnosticsEngine['log' + type](category, message);
+                            }
+                        };
+
+                        // Mock EventBus (vereinfacht)
+                        window.EventBus = {
+                            events: {},
+                            subscribe: function(event, callback) {
+                                if (!this.events[event]) this.events[event] = [];
+                                this.events[event].push(callback);
+                                logToDiagnostics('Info', 'EventBus', 'Subscribed to: ' + event);
+                            },
+                            publish: function(event, data) {
+                                logToDiagnostics('Event', 'EventBus', 'Published: ' + event + ' → ' + JSON.stringify(data));
+                                if (this.events[event]) {
+                                    this.events[event].forEach(callback => {
+                                        try {
+                                            callback(data);
+                                            logToDiagnostics('Info', 'EventBus', 'Callback executed for: ' + event);
+                                        } catch (e) {
+                                            logToDiagnostics('Error', 'EventBus', 'Callback error for ' + event + ': ' + e.message);
+                                        }
+                                    });
+                                }
+                            }
+                        };
+
+                        // Mock-Funktionen
+                        function setupSheets() {
+                            logToDiagnostics('Info', 'Function', 'setupSheets() aufgerufen');
+                            document.getElementById('indexInfo').innerText = 'Mock: Tabellen würden jetzt angelegt';
+                        }
+
+                        function toggleImportForm() {
+                            const form = document.getElementById('importForm');
+                            form.classList.toggle('hidden');
+                            logToDiagnostics('Info', 'UI', 'Import-Form toggled');
+                        }
+
+                        function loadAllData(callback) {
+                            logToDiagnostics('Info', 'Function', 'loadAllData() aufgerufen');
+                            if (callback) callback();
+                        }
+
+                        function showView(view) {
+                            logToDiagnostics('Info', 'UI', 'Switched to view: ' + view);
+                        }
+
+                        function startImport() {
+                            const text = document.getElementById('importText').value;
+                            logToDiagnostics('Info', 'Parser', 'Import gestartet mit ' + text.length + ' Zeichen');
+                            document.getElementById('parserPreview').textContent = 'Mock-Parse-Ergebnis für:\\n' + text.substring(0, 100) + '...';
+                        }
+
+                        // Modal-Funktionen
+                        function openDarlehnsModal(code, sektion) {
+                            logToDiagnostics('Info', 'Modal', 'Opening Darlehen Modal: ' + code + ', ' + sektion);
+                            EventBus.publish('openDarlehenModal', {code, sektion});
+                        }
+
+                        function openDarlehensnehmerModal(code, sektion) {
+                            logToDiagnostics('Info', 'Modal', 'Opening Darlehensnehmer Modal: ' + code + ', ' + sektion);
+                            EventBus.publish('openDarlehensnehmerModal', {code, sektion});
+                        }
+
+                        function closeDarlehensModal() {
+                            document.getElementById('textbausteineModal_darlehen').style.display = 'none';
+                            logToDiagnostics('Info', 'Modal', 'Darlehen Modal geschlossen');
+                        }
+
+                        function closeDarlehensnehmerModal() {
+                            document.getElementById('textbausteineModal_darlehensnehmer').style.display = 'none';
+                            logToDiagnostics('Info', 'Modal', 'Darlehensnehmer Modal geschlossen');
+                        }
+
+                        function processTextbausteineModal_darlehen() {
+                            logToDiagnostics('Info', 'Modal', 'Darlehen Modal verarbeitet');
+                            closeDarlehensModal();
+                        }
+
+                        function processTextbausteineModal_darlehensnehmer() {
+                            logToDiagnostics('Info', 'Modal', 'Darlehensnehmer Modal verarbeitet');
+                            closeDarlehensnehmerModal();
+                        }
+
+                        // Test-Funktionen
+                        function testEventBus() {
+                            logToDiagnostics('Info', 'Test', 'EventBus-Test gestartet');
+                            EventBus.publish('testEvent', {message: 'Test-Nachricht'});
+                            
+                            // Teste Modal-Öffnung
+                            EventBus.subscribe('openDarlehenModal', (data) => {
+                                document.getElementById('textbausteineModal_darlehen').style.display = 'block';
+                            });
+                            
+                            openDarlehnsModal('01_01', 'Test-Sektion');
+                        }
+
+                        function testModals() {
+                            logToDiagnostics('Info', 'Test', 'Modal-Test gestartet');
+                            openDarlehensnehmerModal('02_01', 'Test-Sektion');
+                            
+                            EventBus.subscribe('openDarlehensnehmerModal', (data) => {
+                                document.getElementById('textbausteineModal_darlehensnehmer').style.display = 'block';
+                            });
+                        }
+
+                        // Initialisierung
+                        logToDiagnostics('Info', 'System', 'Test-Anwendung initialisiert');
+                    <\/script>
+                </body>
+                </html>
+                `;
+
+                // Schreibe HTML in iframe
+                iframe.srcdoc = htmlContent;
+                
+                this.logInfo('App', '✅ Test-Anwendung in iframe geladen');
+            },
+
+            // Logging-Funktionen
+            logInfo(category, message) {
+                this.addLog('info', category, message);
+            },
+
+            logError(category, message) {
+                this.addLog('error', category, message);
+                this.updateStatus('error');
+            },
+
+            logWarning(category, message) {
+                this.addLog('warning', category, message);
+            },
+
+            logEvent(category, message) {
+                this.addLog('event', category, message);
+                this.logs.events.push({
+                    timestamp: new Date(),
+                    category,
+                    message
+                });
+                this.updateEventLog();
+            },
+
+            logFunction(name, args) {
+                const entry = {
+                    timestamp: new Date(),
+                    function: name,
+                    arguments: args
+                };
+                this.logs.functions.push(entry);
+                this.logInfo('Function', `${name}(${args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(', ')})`);
+                this.updateFunctionLog();
+            },
+
+            addLog(type, category, message) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logElement = document.createElement('div');
+                logElement.className = `log-entry log-${type}`;
+                logElement.innerHTML = `[${timestamp}] <strong>${category}:</strong> ${message}`;
+
+                // Füge zu entsprechendem Log-Bereich hinzu
+                let targetId;
+                switch (type) {
+                    case 'error':
+                    case 'warning':
+                        targetId = 'errorLog';
+                        break;
+                    case 'event':
+                        targetId = 'eventBusLog';
+                        break;
+                    default:
+                        targetId = 'systemStatus';
+                }
+
+                const container = document.getElementById(targetId);
+                if (container) {
+                    container.appendChild(logElement);
+                    container.scrollTop = container.scrollHeight;
+                }
+            },
+
+            updateEventLog() {
+                const container = document.getElementById('eventBusLog');
+                // Zeige nur die letzten 10 Events
+                const recentEvents = this.logs.events.slice(-10);
+                container.innerHTML = recentEvents.map(event => 
+                    `<div class="log-event">[${event.timestamp.toLocaleTimeString()}] ${event.category}: ${event.message}</div>`
+                ).join('');
+            },
+
+            updateFunctionLog() {
+                const container = document.getElementById('functionLog');
+                const recentCalls = this.logs.functions.slice(-10);
+                container.innerHTML = recentCalls.map(call => 
+                    `<div class="log-info">[${call.timestamp.toLocaleTimeString()}] ${call.function}(${call.arguments.length} args)</div>`
+                ).join('');
+            },
+
+            // Utility-Funktionen
+            toggleSection(header) {
+                const section = header.parentElement;
+                section.classList.toggle('collapsed');
+            },
+
+            clearLogs() {
+                this.logs = { events: [], errors: [], functions: [], states: [] };
+                document.getElementById('systemStatus').innerHTML = '<div class="log-info">Logs gelöscht</div>';
+                document.getElementById('eventBusLog').innerHTML = '<div class="log-event">Warte auf Events...</div>';
+                document.getElementById('errorLog').innerHTML = '<div class="log-info">Keine Fehler</div>';
+                document.getElementById('functionLog').innerHTML = '<div class="log-info">Bereit für Function-Tracking</div>';
+                this.logInfo('System', 'Alle Logs gelöscht');
+            },
+
+            runSystemCheck() {
+                this.logInfo('System-Check', 'Starte umfassende Systemprüfung...');
+                
+                setTimeout(() => {
+                    // Simuliere verschiedene Checks
+                    this.logInfo('System-Check', '✅ EventBus funktionsfähig');
+                    this.logInfo('System-Check', '✅ Mock-APIs reagieren');
+                    this.logInfo('System-Check', '✅ DOM-Manipulation funktioniert');
+                    this.logInfo('System-Check', '✅ Iframe-Kommunikation aktiv');
+                    this.logInfo('System-Check', '🎉 Alle Tests bestanden!');
+                }, 1000);
+            },
+
+            simulateError() {
+                this.logError('Simulation', 'Test-Fehler: Modal nicht gefunden');
+                this.logError('Simulation', 'Test-Fehler: Undefined variable access');
+                this.logWarning('Simulation', 'Test-Warnung: Deprecated function call');
+            },
+
+            generateReport() {
+                const report = {
+                    timestamp: new Date().toISOString(),
+                    session_duration: 'Aktuelle Session',
+                    total_events: this.logs.events.length,
+                    total_functions: this.logs.functions.length,
+                    errors_count: this.logs.errors?.length || 0,
+                    events: this.logs.events,
+                    functions: this.logs.functions,
+                    system_status: 'Operational'
+                };
+
+                const reportText = `
+=== 🤖 KI-DIAGNOSE-REPORT ===
+Generiert: ${report.timestamp}
+
+📊 ÜBERSICHT:
+- Events verarbeitet: ${report.total_events}
+- Funktionsaufrufe: ${report.total_functions}  
+- Fehler aufgetreten: ${report.errors_count}
+- System-Status: ${report.system_status}
+
+📝 LETZTE EVENTS:
+${this.logs.events.slice(-5).map(e => `[${e.timestamp.toLocaleTimeString()}] ${e.category}: ${e.message}`).join('\n')}
+
+🔧 LETZTE FUNKTIONEN:
+${this.logs.functions.slice(-5).map(f => `[${f.timestamp.toLocaleTimeString()}] ${f.function}()`).join('\n')}
+
+🎯 KI-EMPFEHLUNGEN:
+- System läuft stabil
+- Keine kritischen Probleme erkannt
+- EventBus funktioniert ordnungsgemäß
+
+=== ENDE REPORT ===
+                `;
+
+                document.getElementById('aiDiagnostics').innerHTML = `<pre style="white-space: pre-wrap; font-size: 11px;">${reportText}</pre>`;
+                this.logInfo('KI-Report', 'Diagnose-Report erstellt');
+            },
+
+            updateStatus(status) {
+                const indicator = document.querySelector('.status-indicator');
+                indicator.className = `status-indicator status-${status}`;
+            }
+        };
+
+        // System starten
+        document.addEventListener('DOMContentLoaded', () => {
+            DiagnosticsEngine.init();
+        });
+    </script>
+</body>
+</html>

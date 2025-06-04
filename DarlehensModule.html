@@ -1,0 +1,263 @@
+<!-- DarlehensModule.html -->
+<script>
+/***************************************************
+ * DarlehensModule.js - Improved (Event-kompatibel und modular)
+ * Dieses Modul behandelt das Öffnen, Vorbelegen, Verarbeiten und Schließen
+ * des Darlehensformulars.
+ ***************************************************/
+const DarlehensModule = (() => {
+  let darlehenCount = 0;
+
+  // Öffnet das Darlehensformular und initialisiert Parameter und UI
+  function openForm(code, sektion) {
+    // Parameter setzen
+    window._tbCode = code;
+    window._tbSektion = sektion;
+    const modal = ModalManager.getModal("textbausteineModal_darlehen");
+    if (!modal) {
+      console.error("Darlehensmodal nicht gefunden!");
+      return;
+    }
+    ModalManager.openModal("textbausteineModal_darlehen");
+
+    // Reset Darlehensblock-Zähler und leere den Container
+    darlehenCount = 0;
+    const container = modal.querySelector("#darlehenContainer");
+    if (container) {
+      container.innerHTML = "";
+      // Erster Darlehensblock wird hinzugefügt
+      addDarlehenBlock(container);
+    }
+    bindEventListeners();
+  }
+
+  // Bindet interne Event-Listener für die Schaltflächen im Modal
+  function bindEventListeners() {
+    const modal = document.getElementById("textbausteineModal_darlehen");
+    if (!modal) return;
+    const btnAdd = modal.querySelector("#btnAddDarlehenBlock");
+
+    if (btnAdd) {
+      btnAdd.onclick = function() {
+        const container = modal.querySelector("#darlehenContainer");
+        if (container) {
+          addDarlehenBlock(container);
+        }
+      };
+    }
+    // Die Buttons "Speichern" und "Abbrechen" werden über globale ButtonModule-Funktionen aufgerufen:
+    // processTextbausteineModal_darlehen() und closeDarlehensModal().
+  }
+
+  // Fügt einen neuen Darlehensblock hinzu und erhöht den Zähler
+  function addDarlehenBlock(container) {
+    darlehenCount++;
+    const currentYear = new Date().getFullYear();
+    const y1 = currentYear - 1;
+    const y2 = currentYear - 2;
+    const y3 = currentYear - 3;
+
+    // Tabellenbasierte Darstellung für besseren Überblick
+    const block = document.createElement("div");
+    block.className = "darlehenBlock";
+    block.innerHTML = `
+      <h3>Darlehen ${darlehenCount}</h3>
+      <table class="darlehenTable" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 4px;">
+            <label>
+              <input type="checkbox" class="cb_darlehensvertrag" />
+              Darlehensvertrag
+            </label>
+          </td>
+          <td style="padding: 4px;">
+            <input type="text" class="inp_vertragnr" placeholder="Vertragsnummer" />
+          </td>
+          <td style="padding: 4px;"></td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px;">
+            <label>
+              <input type="checkbox" class="cb_jahreskonto_1" />
+              Jahreskontoauszug
+            </label>
+          </td>
+          <td style="padding: 4px;">
+            <input type="text" class="inp_jahres_vertragnr_1" placeholder="Vertragsnummer" />
+          </td>
+          <td style="padding: 4px;">
+            <input type="text" class="inp_jahres_jahr_1 yearInput" value="${y1}" />
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px;">
+            <label>
+              <input type="checkbox" class="cb_jahreskonto_2" />
+              Jahreskontoauszug
+            </label>
+          </td>
+          <td style="padding: 4px;">
+            <input type="text" class="inp_jahres_vertragnr_2" placeholder="Vertragsnummer" />
+          </td>
+          <td style="padding: 4px;">
+            <input type="text" class="inp_jahres_jahr_2 yearInput" value="${y2}" />
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px;">
+            <label>
+              <input type="checkbox" class="cb_jahreskonto_3" />
+              Jahreskontoauszug
+            </label>
+          </td>
+          <td style="padding: 4px;">
+            <input type="text" class="inp_jahres_vertragnr_3" placeholder="Vertragsnummer" />
+          </td>
+          <td style="padding: 4px;">
+            <input type="text" class="inp_jahres_jahr_3 yearInput" value="${y3}" />
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding: 4px;">
+            <label>
+              <input type="checkbox" class="cb_jahreskonto_bsv" />
+              Jahreskontoauszug BSV
+            </label>
+          </td>
+          <td style="padding: 4px;">
+            <input type="text" class="inp_jahres_bsv_vertragnr" placeholder="Vertragsnummer BSV" />
+          </td>
+          <td style="padding: 4px;">
+            <input type="text" class="inp_jahres_bsv_jahr yearInput" value="${y1}" />
+          </td>
+        </tr>
+      </table>
+    `;
+    container.appendChild(block);
+
+    // Automatische Übernahme der Vertragsnummer in die Jahreskontoauszug-Felder
+    const inpVertrag = block.querySelector(".inp_vertragnr");
+    if (inpVertrag) {
+      inpVertrag.addEventListener("input", function() {
+        const val = this.value.trim();
+        const inp1 = block.querySelector(".inp_jahres_vertragnr_1");
+        const inp2 = block.querySelector(".inp_jahres_vertragnr_2");
+        const inp3 = block.querySelector(".inp_jahres_vertragnr_3");
+        if (inp1) inp1.value = val;
+        if (inp2) inp2.value = val;
+        if (inp3) inp3.value = val;
+      });
+    }
+  }
+
+  // Liest die Formular-Eingaben aus und speichert die neuen Dokumente
+  function processForm() {
+    const modal = document.getElementById("textbausteineModal_darlehen");
+    if (!modal) return;
+    let newDocs = [];
+
+    // Optional: Modernisierungsmaßnahmen
+    const cbModernisierung = modal.querySelector("#cb_modernisierung");
+    if (cbModernisierung && cbModernisierung.checked) {
+      newDocs.push({
+        code: window._tbCode,
+        sektion: window._tbSektion,
+        docText: "Aufstellung der vergangenen Modernisierungsmaßnahmen"
+      });
+    }
+
+    const blocks = modal.querySelectorAll(".darlehenBlock");
+    blocks.forEach((block) => {
+      // Darlehensvertrag
+      const cbVertrag = block.querySelector(".cb_darlehensvertrag");
+      const inpVertragNr = block.querySelector(".inp_vertragnr");
+      if (cbVertrag && cbVertrag.checked) {
+        const nr = inpVertragNr ? inpVertragNr.value.trim() : "";
+        const docText = "Darlehensvertrag " + (nr || "(ohne Nummer)");
+        newDocs.push({
+          code: window._tbCode,
+          sektion: window._tbSektion,
+          docText: docText
+        });
+      }
+      // Jahreskontoauszüge
+      const processJK = (cbSelector, nrSelector, yearSelector) => {
+        const cb = block.querySelector(cbSelector);
+        const inpNr = block.querySelector(nrSelector);
+        const inpYear = block.querySelector(yearSelector);
+        if (cb && cb.checked) {
+          const nr = inpNr ? inpNr.value.trim() : "";
+          const jahr = inpYear ? inpYear.value.trim() : "";
+          const docText = `Jahreskontoauszug ${jahr} (Vertrag ${nr || "(ohne Nummer)"})`;
+          newDocs.push({
+            code: window._tbCode,
+            sektion: window._tbSektion,
+            docText: docText
+          });
+        }
+      };
+      processJK(".cb_jahreskonto_1", ".inp_jahres_vertragnr_1", ".inp_jahres_jahr_1");
+      processJK(".cb_jahreskonto_2", ".inp_jahres_vertragnr_2", ".inp_jahres_jahr_2");
+      processJK(".cb_jahreskonto_3", ".inp_jahres_vertragnr_3", ".inp_jahres_jahr_3");
+
+      // Jahreskontoauszug BSV
+      const cbBsv = block.querySelector(".cb_jahreskonto_bsv");
+      const inpBsvNr = block.querySelector(".inp_jahres_bsv_vertragnr");
+      const inpBsvJahr = block.querySelector(".inp_jahres_bsv_jahr");
+      if (cbBsv && cbBsv.checked) {
+        const nr = inpBsvNr ? inpBsvNr.value.trim() : "";
+        const jahr = inpBsvJahr ? inpBsvJahr.value.trim() : "";
+        const docText = `Jahreskontoauszug BSV ${jahr} (Vertrag ${nr || "(ohne Nummer)"})`;
+        newDocs.push({
+          code: window._tbCode,
+          sektion: window._tbSektion,
+          docText: docText
+        });
+      }
+    });
+
+    // Integration in das globale Änderungs-Management
+    if (!window._UNSAVED_CHANGES) {
+      window._UNSAVED_CHANGES = { additions: [] };
+    }
+    newDocs.forEach(doc => {
+      const tempId = "temp_" + new Date().getTime();
+      window._UNSAVED_CHANGES.additions.push({ tempId, code: window._tbCode, sektion: window._tbSektion, docText: doc.docText });
+      window.allDocs.push({
+        docId: tempId,
+        checkId: window.currentCheckId,
+        code: window._tbCode,
+        sektion: window._tbSektion,
+        docText: doc.docText,
+        okFileId: "",
+        errFileId: "",
+        hiddenFlag: false,
+        errComment: "",
+        notes: "",
+        docRunNo: ""
+      });
+    });
+    closeForm();
+    if (typeof applyFilter === "function") {
+      applyFilter();
+    }
+    alert("Es wurden " + newDocs.length + " neue Unterlagen vorgemerkt.");
+  }
+
+  // Schließt das Darlehensformular
+  function closeForm() {
+    ModalManager.closeModal("textbausteineModal_darlehen");
+  }
+
+  return {
+    openForm,
+    processForm,
+    closeForm,
+    addDarlehenBlock
+  };
+})();
+</script>
